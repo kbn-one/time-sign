@@ -1,7 +1,6 @@
-import { decaps, encaps, instantiate } from "../lib/rs_lib.generated.js";
+import { decaps, encaps } from "../lib/rs_lib.js";
 import { decodeBase64 } from "@std/encoding/base64";
 import * as msgpack from "@std/msgpack";
-await instantiate();
 
 export function missingFeature() {
   if (typeof Deno != "undefined") return null;
