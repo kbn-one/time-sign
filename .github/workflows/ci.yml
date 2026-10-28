@@ -5,17 +5,73 @@ on:
   pull_request:
     branches: main
 
+permissions:
+  contents: read
+
 jobs:
-  deploy:
-    name: Deploy
+  test:
+    name: Test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Clone repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install Deno
         uses: denoland/setup-deno@v2
 
-      - name: Build step
-        run: "deno task build"
+      - name: Format
+        run: deno fmt --check
+
+      - name: Lint
+        run: deno lint
+
+      - name: Type check
+        run: deno check app.ts server.ts genkey.ts worker/entry.ts client/mod.ts
+
+      - name: Test
+        run: deno test -P
+
+      - name: Build client
+        run: deno task build
+
+      - name: Build worker
+        run: deno task build:worker
+
+  deploy:
+    name: Deploy
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # never run concurrently with a key rotation
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v7
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+
+      - name: Install Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build worker
+        run: deno task build:worker
+
+      # Code-only deploy: IBKEM_* secrets already stored on the Worker are kept.
+      # They are only (re)written by .github/workflows/keygen.yml.
+      - name: Deploy to Cloudflare Workers
+        run: npx cf deploy --message "${GITHUB_SHA}"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

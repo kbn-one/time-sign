@@ -1,8 +1,7 @@
 import { decrypt, encrypt } from "./mod.ts";
 import { decodeBase64 } from "@std/encoding/base64";
-import { extract_usk, instantiate } from "../lib/rs_lib.generated.js";
+import { extract_usk } from "../lib/rs_lib.js";
 import { assertEquals } from "@std/assert/equals";
-await instantiate();
 
 class Server {
   mpk: Uint8Array;
