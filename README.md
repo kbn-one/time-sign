@@ -8,7 +8,7 @@ the decryption key for a date only after that date has passed.
 import {
   decrypt,
   encrypt,
-} from "https://raw.githubusercontent.com/kuboon/time-sign/main/client/mod.ts";
+} from "https://raw.githubusercontent.com/kbn-one/time-sign/main/client/mod.ts";
 
 const server = "https://time-sign.kbn.one";
 const time = "2023-04-01";
@@ -37,8 +37,8 @@ key served by the server was produced by that workflow:
 
 ```sh
 curl -sSo master_pk.bin https://time-sign.kbn.one/master_pk
-gh attestation verify master_pk.bin -R kuboon/time-sign \
-  --signer-workflow kuboon/time-sign/.github/workflows/keygen.yml
+gh attestation verify master_pk.bin -R kbn-one/time-sign \
+  --signer-workflow kbn-one/time-sign/.github/workflows/keygen.yml
 ```
 
 ## Development
@@ -52,7 +52,7 @@ IBKEM_PUBLIC_KEY=... IBKEM_SECRET_KEY=... deno task server
 
 ## Deploy (Cloudflare Workers)
 
-Repository secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+Repository secret `CLOUDFLARE_API_TOKEN` and variable `CLOUDFLARE_ACCOUNT_ID`.
 
 - Pushes to `main` deploy the code only; existing key secrets are kept.
 - Run the **Generate master key** workflow (input `rotate`) for the first deploy
