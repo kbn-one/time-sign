@@ -1,0 +1,31 @@
+{
+  "tasks": {
+    "dev": "deno serve -P=dev --watch --port 8000 router.tsx",
+    "build": "deno run -c deno.json -P=build jsr:@remix-kbn/ssg@^0.13.0/build.ts --out ../dist",
+    "build:worker": "deno bundle --platform=browser --external='*.wasm' -o ../worker-dist/worker.js worker.ts",
+    "build:cf": {
+      "description": "Static site + Worker bundle, arranged as the Build Output for `cf deploy --prebuilt`",
+      "dependencies": ["build", "build:worker"],
+      "command": "deno run -A cf_build.ts"
+    }
+  },
+  "permissions": {
+    "build": {
+      "read": ["../.."],
+      "write": ["../dist"],
+      "env": { "ignore": ["NODE_ENV", "IBKEM_PUBLIC_KEY", "IBKEM_SECRET_KEY"] },
+      "import": true
+    },
+    "dev": {
+      "read": ["../.."],
+      "env": ["IBKEM_PUBLIC_KEY", "IBKEM_SECRET_KEY", "PORT"],
+      "net": ["0.0.0.0", "127.0.0.1", "localhost"],
+      "import": true
+    }
+  },
+  "compilerOptions": {
+    "lib": ["deno.ns", "deno.unstable", "dom", "dom.iterable", "esnext"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "remix/component"
+  }
+}
