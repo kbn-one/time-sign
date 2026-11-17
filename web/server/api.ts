@@ -1,9 +1,27 @@
-import {
-  createRouter,
-  type Middleware,
-  type Router,
-} from "@remix-run/fetch-router";
-import { routes } from "./routes.ts";
+/**
+ * The API: `GET /master_pk` and `GET /at/<date>`.
+ *
+ * A router of its own, because it is deployed on its own: Cloudflare serves the pages as static
+ * assets and sends only {@link API_PATHS} to the Worker (`worker.ts`), which answers with this.
+ * Locally `router.tsx` makes the same split.
+ */
+
+import { cors } from "remix/middleware/cors";
+import { createRouter, type Middleware, type Router } from "remix/router";
+
+import { routes } from "../client/routes.ts";
+
+/**
+ * The paths the API answers, as Cloudflare's `assets.runWorkerFirst` patterns: these reach the
+ * Worker, everything else is a static file. `cloudflare.config.ts` lists the same (checked by
+ * `router.test.ts`).
+ */
+export const API_PATHS = ["/master_pk", "/at/*"];
+
+/** Whether a pathname belongs to the API, by {@link API_PATHS}. */
+export function isApiPath(pathname: string): boolean {
+  return pathname === "/master_pk" || pathname.startsWith("/at/");
+}
 
 export type Bindings = {
   /** base64 encoded master public key */
@@ -16,41 +34,9 @@ type ExtractUsk = (sk: Uint8Array, id: string) => Uint8Array;
 
 const TEXT = { "content-type": "text/plain; charset=UTF-8" };
 
-const USAGE = `
-  Usage:
-  /master_pk to get the master public key
-  /at/<date> to get the secret key for the given date
-  `;
-
 function notFound(): Response {
   return new Response("404 Not Found", { status: 404, headers: TEXT });
 }
-
-/**
- * CORS for `GET /` only, as the service has always answered: every method on
- * exactly `/` gets `Access-Control-Allow-Origin: *`, and `OPTIONS /` is a 204
- * preflight allowing `GET`. Other paths get no CORS headers.
- */
-const rootCors: Middleware = async (context, next) => {
-  if (context.url.pathname !== "/") return next();
-  if (context.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "access-control-allow-origin": "*",
-        "access-control-allow-methods": "GET",
-      },
-    });
-  }
-  const response = await next();
-  const headers = new Headers(response.headers);
-  headers.set("access-control-allow-origin", "*");
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  });
-};
 
 /**
  * A known path with an unsupported method is a 404, not fetch-router's 405,
@@ -90,9 +76,10 @@ function decodeSegment(segment: string): string {
 /** `/at/<one non-empty segment>`, matched on the raw pathname. */
 const AT_PATH = /^\/at\/([^/]+)$/;
 
-export function createApp(extract_usk: ExtractUsk, env: Bindings): Router {
+export function createApi(extract_usk: ExtractUsk, env: Bindings): Router {
   const router = createRouter({
-    middleware: [rootCors, notFoundAndHead],
+    // CORS allows any origin on every path: both answers are public by design.
+    middleware: [cors(), notFoundAndHead],
     // route-pattern will not match a segment with a malformed escape such as
     // `%ZZ`; it is still a (bad) date, so it gets the date route's 400.
     defaultHandler({ method, url }) {
@@ -116,8 +103,6 @@ export function createApp(extract_usk: ExtractUsk, env: Bindings): Router {
     const usk = extract_usk(sk, at);
     return new Response(usk as Uint8Array<ArrayBuffer>);
   }
-
-  router.get(routes.home, () => new Response(USAGE, { headers: TEXT }));
 
   router.get(
     routes.masterPk,

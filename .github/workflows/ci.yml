@@ -21,23 +21,21 @@ jobs:
       - name: Install Deno
         uses: denoland/setup-deno@v2
 
-      - name: Format
-        run: deno fmt --check
-
-      - name: Lint
-        run: deno lint
-
-      - name: Type check
-        run: deno check routes.ts router.ts server.ts genkey.ts worker/entry.ts client/mod.ts
+      - name: Type check, lint, format
+        run: deno task check
 
       - name: Test
-        run: deno test -P
+        run: deno task test
 
-      - name: Build client
-        run: deno task build
+      - name: Build client library
+        run: deno task build:lib
 
-      - name: Build worker
-        run: deno task build:worker
+      # Static site + Worker, arranged for `cf deploy --prebuilt`.
+      - name: Build for Cloudflare
+        run: deno task build:cf
+
+      - name: Deploy (dry run)
+        run: deno task -q cf deploy --prebuilt --dry-run
 
   deploy:
     name: Deploy
@@ -57,16 +55,8 @@ jobs:
       - name: Install Deno
         uses: denoland/setup-deno@v2
 
-      - name: Install Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: npm
-
-      - run: npm ci
-
-      - name: Build worker
-        run: deno task build:worker
+      - name: Build for Cloudflare
+        run: deno task build:cf
 
       # Code-only deploy: IBKEM_* secrets already stored on the Worker are kept.
       # They are only (re)written by .github/workflows/keygen.yml, which also
@@ -74,7 +64,7 @@ jobs:
       - name: Deploy to Cloudflare Workers
         run: |
           set +e
-          npx cf deploy --message "${GITHUB_SHA}" 2>&1 | tee "$RUNNER_TEMP/deploy.log"
+          deno task -q cf deploy --prebuilt --message "${GITHUB_SHA}" 2>&1 | tee "$RUNNER_TEMP/deploy.log"
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ] && tr '\n' ' ' < "$RUNNER_TEMP/deploy.log" | sed 's/│//g; s/  */ /g' | grep -q "Worker does not exist yet"; then
             echo "::warning::Worker not created yet. Run the 'Generate master key' workflow (input: rotate) to create it with a key pair."

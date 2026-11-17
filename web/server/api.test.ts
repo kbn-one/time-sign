@@ -1,13 +1,14 @@
 // Pins the HTTP behaviour the service had on Hono: paths, status codes, bodies
-// and headers, including the corners (CORS on `/` only, 404 rather than 405,
-// dates containing `.` or escapes).
+// and headers, including the corners (404 rather than 405, dates containing
+// `.` or escapes). CORS is the one deliberate change: Hono only answered it on
+// `/`; now every path allows any origin.
 import { assertEquals } from "@std/assert";
-import { createApp } from "./router.ts";
-import { decrypt, encrypt } from "./client/mod.ts";
-import { extract_usk, setup } from "./lib/rs_lib.js";
+import { createApi } from "./api.ts";
+import { decrypt, encrypt } from "../../client/mod.ts";
+import { extract_usk, setup } from "../../lib/rs_lib.js";
 
 const [pk, sk]: [string, string] = setup();
-const router = createApp(extract_usk, {
+const router = createApi(extract_usk, {
   IBKEM_PUBLIC_KEY: pk,
   IBKEM_SECRET_KEY: sk,
 });
@@ -29,31 +30,34 @@ async function expectText(
   assertEquals(await res.text(), body);
 }
 
-Deno.test("GET / returns usage with CORS", async () => {
-  const res = await req("/", { headers: ORIGIN });
-  assertEquals(res.status, 200);
-  assertEquals([...res.headers], [
-    ["access-control-allow-origin", "*"],
-    ["content-type", TEXT],
-  ]);
-  const body = await res.text();
-  assertEquals(body.includes("/master_pk to get the master public key"), true);
-  assertEquals(body.includes("/at/<date> to get the secret key"), true);
+Deno.test("every path answers a CORS preflight for any origin", async () => {
+  for (const path of ["/master_pk", "/at/2000-01-01", "/nope"]) {
+    const res = await req(path, {
+      method: "OPTIONS",
+      headers: { ...ORIGIN, "Access-Control-Request-Method": "GET" },
+    });
+    assertEquals(res.status, 204, path);
+    assertEquals(res.headers.get("access-control-allow-origin"), "*", path);
+    assertEquals(
+      res.headers.get("access-control-allow-methods")?.includes("GET"),
+      true,
+      path,
+    );
+  }
 });
 
-Deno.test("OPTIONS / is a CORS preflight", async () => {
-  const res = await req("/", {
-    method: "OPTIONS",
-    headers: { ...ORIGIN, "Access-Control-Request-Method": "GET" },
-  });
-  await expectText(res, 204, "", [
-    ["access-control-allow-methods", "GET"],
-    ["access-control-allow-origin", "*"],
-  ]);
+Deno.test("every path allows any origin", async () => {
+  for (
+    const path of ["/master_pk", "/at/2000-01-01", "/at/2999-01-01", "/nope"]
+  ) {
+    const res = await req(path, { headers: ORIGIN });
+    await res.body?.cancel();
+    assertEquals(res.headers.get("access-control-allow-origin"), "*", path);
+  }
 });
 
 Deno.test("GET /master_pk returns the raw public key", async () => {
-  const res = await req("/master_pk", { headers: ORIGIN });
+  const res = await req("/master_pk");
   assertEquals(res.status, 200);
   assertEquals([...res.headers], []);
   assertEquals(
@@ -111,19 +115,11 @@ Deno.test("unknown paths and methods are 404", async () => {
     notFound,
   );
   await expectText(
-    await req("/at/2000-01-01", {
-      method: "OPTIONS",
-      headers: { ...ORIGIN, "Access-Control-Request-Method": "GET" },
-    }),
+    await req("/at/2000-01-01", { method: "POST" }),
     404,
     "404 Not Found",
     notFound,
   );
-  // `/` keeps its CORS header on a 404
-  await expectText(await req("/", { method: "POST" }), 404, "404 Not Found", [
-    ["access-control-allow-origin", "*"],
-    ["content-type", TEXT],
-  ]);
 });
 
 Deno.test("HEAD answers like GET without a body", async () => {

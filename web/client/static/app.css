@@ -1,0 +1,67 @@
+/*
+ * Tokens and document-level defaults. Everything else is a `css(...)` mixin from
+ * `remix/component`, which Remix renders into the `rmx` layer of each page's <head>.
+ */
+
+@layer base, rmx, app;
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+    --bg: light-dark(#fbfaf7, #14161a);
+    --fg: light-dark(#1d2025, #e8e6e1);
+    --muted: light-dark(#5d636d, #9aa1ab);
+    --accent: light-dark(#2f5bd3, #8fb0ff);
+    --on-accent: light-dark(#ffffff, #0d1426);
+    --border: light-dark(#dcd8cf, #2d3138);
+    --card: light-dark(#f2efe8, #1c1f24);
+    --danger: light-dark(#b3261e, #ffb4ab);
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 14px;
+    --content-width: 46rem;
+    --font-sans:
+      system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP",
+      sans-serif;
+    --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    line-height: 1.6;
+  }
+
+  a {
+    color: var(--accent);
+  }
+
+  code,
+  pre,
+  textarea {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+
+  pre {
+    overflow-x: auto;
+    padding: 1rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+
+  h1,
+  h2,
+  h3 {
+    line-height: 1.25;
+  }
+}
