@@ -4,7 +4,7 @@
 // @ts-ignore: resolved by the Workers bundler (CompiledWasm module rule)
 import wasmModule from "../lib/rs_lib.wasm";
 import * as glue from "../lib/rs_lib.internal.js";
-import { createApp } from "../app.ts";
+import { type Bindings, createApp } from "../router.ts";
 
 const instance = new WebAssembly.Instance(wasmModule as WebAssembly.Module, {
   "./rs_lib.internal.js": glue as unknown as WebAssembly.ModuleImports,
@@ -14,4 +14,13 @@ const exports = instance.exports as any;
 glue.__wbg_set_wasm(exports);
 exports.__wbindgen_start();
 
-export default createApp(glue.extract_usk);
+// The secrets arrive with the first request, and are the same for every request
+// an isolate serves, so the router is built once from them.
+let router: ReturnType<typeof createApp> | undefined;
+
+export default {
+  fetch(request: Request, env: Bindings): Promise<Response> {
+    router ??= createApp(glue.extract_usk, env);
+    return router.fetch(request);
+  },
+};

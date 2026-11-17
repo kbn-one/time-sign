@@ -28,7 +28,7 @@ jobs:
         run: deno lint
 
       - name: Type check
-        run: deno check app.ts server.ts genkey.ts worker/entry.ts client/mod.ts
+        run: deno check routes.ts router.ts server.ts genkey.ts worker/entry.ts client/mod.ts
 
       - name: Test
         run: deno test -P
