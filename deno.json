@@ -13,6 +13,7 @@
     "@std/encoding": "jsr:@std/encoding@^1.0.11",
     "@std/msgpack": "jsr:@std/msgpack@^1.0.3"
   },
+  "nodeModulesDir": "auto",
   "exclude": ["dist/", "node_modules/", "client/mod.js"],
   "permissions": {
     "default": {
