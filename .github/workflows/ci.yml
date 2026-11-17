@@ -69,9 +69,18 @@ jobs:
         run: deno task build:worker
 
       # Code-only deploy: IBKEM_* secrets already stored on the Worker are kept.
-      # They are only (re)written by .github/workflows/keygen.yml.
+      # They are only (re)written by .github/workflows/keygen.yml, which also
+      # creates the Worker on its first run; until then this step is skipped.
       - name: Deploy to Cloudflare Workers
-        run: npx cf deploy --message "${GITHUB_SHA}"
+        run: |
+          set +e
+          npx cf deploy --message "${GITHUB_SHA}" 2>&1 | tee "$RUNNER_TEMP/deploy.log"
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ] && tr '\n' ' ' < "$RUNNER_TEMP/deploy.log" | sed 's/│//g; s/  */ /g' | grep -q "Worker does not exist yet"; then
+            echo "::warning::Worker not created yet. Run the 'Generate master key' workflow (input: rotate) to create it with a key pair."
+            exit 0
+          fi
+          exit "$status"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
