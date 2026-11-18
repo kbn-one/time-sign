@@ -9,6 +9,7 @@
 import { css, type Handle, type RemixNode } from "remix/component";
 
 import { routes } from "./routes.ts";
+import type { PageMeta } from "./site.ts";
 import { color } from "./tokens.ts";
 
 /** Where the client runtime lives, and the chunks it imports. */
@@ -22,6 +23,12 @@ export interface LayoutProps {
   description: string;
   /** The client runtime for a page that places an island; `null` for one that does not. */
   script: ClientRuntime | null;
+  /** Card meta tags (`og:*` as `property`, the rest as `name`), for a page meant to be shared. */
+  tags?: PageMeta["tags"];
+  /** Anything else the page needs in `<head>`. */
+  head?: RemixNode;
+  /** The page alone, filling `<body>`: no header or footer (the X player card's frame). */
+  bare?: boolean;
   children: RemixNode;
 }
 
@@ -38,7 +45,8 @@ export const REPOSITORY_URL = "https://github.com/kbn-one/time-sign";
 
 export function Layout(handle: Handle<LayoutProps>) {
   return () => {
-    const { title, description, script, children } = handle.props;
+    const { title, description, script, tags, head, bare, children } =
+      handle.props;
     return (
       <html lang="en">
         <head>
@@ -48,7 +56,14 @@ export function Layout(handle: Handle<LayoutProps>) {
             content="width=device-width, initial-scale=1"
           />
           <title>{title}</title>
-          <meta name="description" content={description} />
+          {tags
+            ? Object.entries(tags).map(([key, content]) =>
+              key.startsWith("og:")
+                ? <meta key={key} property={key} content={content} />
+                : <meta key={key} name={key} content={content} />
+            )
+            : <meta name="description" content={description} />}
+          {head}
           <link
             rel="stylesheet"
             href={routes.static.href({ path: "app.css" })}
@@ -59,20 +74,24 @@ export function Layout(handle: Handle<LayoutProps>) {
           {script && <script type="module" src={script.src} />}
         </head>
         <body>
-          <header mix={headerStyle}>
-            <nav mix={navStyle}>
-              <a href={routes.home.href()} mix={brandStyle}>time-sign</a>
-              <a href={routes.demo.href()}>Demo</a>
-              <a href={REPOSITORY_URL}>GitHub</a>
-            </nav>
-          </header>
-          <main mix={mainStyle}>{children}</main>
-          <footer mix={footerStyle}>
-            <p>
-              Source and key provenance:{" "}
-              <a href={REPOSITORY_URL}>kbn-one/time-sign</a>
-            </p>
-          </footer>
+          {bare ? children : (
+            <>
+              <header mix={headerStyle}>
+                <nav mix={navStyle}>
+                  <a href={routes.home.href()} mix={brandStyle}>time-sign</a>
+                  <a href={routes.demo.href()}>Demo</a>
+                  <a href={REPOSITORY_URL}>GitHub</a>
+                </nav>
+              </header>
+              <main mix={mainStyle}>{children}</main>
+              <footer mix={footerStyle}>
+                <p>
+                  Source and key provenance:{" "}
+                  <a href={REPOSITORY_URL}>kbn-one/time-sign</a>
+                </p>
+              </footer>
+            </>
+          )}
         </body>
       </html>
     );

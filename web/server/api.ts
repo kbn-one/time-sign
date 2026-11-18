@@ -18,11 +18,15 @@ import { timeId } from "../../client/time_id.ts";
 import { routes } from "../client/routes.ts";
 
 /**
- * The paths the API answers, as Cloudflare's `assets.runWorkerFirst` patterns: these reach the
- * Worker, everything else is a static file. `cloudflare.config.ts` lists the same (checked by
- * `router.test.ts`).
+ * The paths the API answers, as Cloudflare's `assets.runWorkerFirst` patterns.
  */
 export const API_PATHS = ["/master_pk", "/at/*"];
+
+/**
+ * Every path Cloudflare sends to the Worker (`assets.runWorkerFirst` in `cloudflare.config.ts`):
+ * the API, and `/post`, whose card the Worker fills in for the moment in `?t=` (`worker.ts`).
+ */
+export const WORKER_PATHS = [...API_PATHS, "/post"];
 
 /** Whether a pathname belongs to the API, by {@link API_PATHS}. */
 export function isApiPath(pathname: string): boolean {

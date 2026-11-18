@@ -20,7 +20,7 @@ export default function Demo(_handle: Handle) {
         for the key, which the server only releases once the moment has passed.
         The sealed message is kept in this browser, so you can come back later.
       </p>
-      <TimeLockDemo libSrc={routes.lib.href()} />
+      <TimeLockDemo />
     </>
   );
 }
