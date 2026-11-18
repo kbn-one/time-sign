@@ -51,10 +51,11 @@ const LINK_MODES: [mode: LinkMode, label: string, explanation: string][] = [
 const STEP_MS = 10_000;
 
 const PRESETS: [label: string, ms: number][] = [
-  ["in 10 seconds", 10_000],
   ["in 1 minute", 60_000],
+  ["in 10 minutes", 600_000],
   ["in 1 hour", 3_600_000],
-  ["1 day ago", -86_400_000],
+  ["in 24 hours", 86_400_000],
+  ["in 1 week", 604_800_000],
 ];
 
 export const TimeLockDemo = clientEntry(
@@ -290,43 +291,30 @@ export const TimeLockDemo = clientEntry(
         <section mix={cardStyle} aria-label="Share">
           <h2 mix={stepStyle}>3. Share</h2>
           {sealed && (
-            <>
-              <fieldset mix={modeStyle}>
-                <legend>Share link</legend>
-                {LINK_MODES.map(([value, label, explanation]) => (
-                  <label key={value} mix={modeOptionStyle}>
-                    <input
-                      type="radio"
-                      name="link-mode"
-                      value={value}
-                      defaultChecked={mode === value}
-                      mix={on("change", () => {
-                        mode = value;
-                        handle.update();
-                      })}
-                    />
-                    <span>
-                      <strong>{label}</strong>
-                      <br />
-                      <span mix={mutedStyle}>{explanation}</span>
-                    </span>
-                  </label>
-                ))}
-              </fieldset>
-              <p mix={postLinkStyle}>
-                <a href={postLink(sealed, mode)} target="_blank">
-                  {postLink(sealed, mode)}
-                </a>
-              </p>
-            </>
+            <div role="radiogroup" aria-label="Share link" mix={modeStyle}>
+              {LINK_MODES.map(([value, label, explanation]) => (
+                <label key={value} mix={modeOptionStyle}>
+                  <input
+                    type="radio"
+                    name="link-mode"
+                    value={value}
+                    defaultChecked={mode === value}
+                    mix={on("change", () => {
+                      mode = value;
+                      handle.update();
+                    })}
+                  />
+                  <span>
+                    <strong>{label}</strong>
+                    <br />
+                    <span mix={mutedStyle}>{explanation}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
           )}
-          <div mix={shareStyle}>
-            <span mix={mutedStyle}>
-              {sealed ? "Share the sealed message:" : "Share this demo:"}
-            </span>
-            {/* Empty `url` shares this page; with a sealed message, its link. */}
-            <share-buttons url={sealed ? postLink(sealed, mode) : ""} />
-          </div>
+          {/* Empty `url` shares this page; with a sealed message, its link. */}
+          <share-buttons url={sealed ? postLink(sealed, mode) : ""} />
         </section>
       </div>
     );
@@ -505,15 +493,7 @@ const openedStyle = css({
 
 const errorStyle = css({ margin: 0, color: color.danger });
 
-const modeStyle = css({
-  display: "grid",
-  gap: "0.5rem",
-  margin: 0,
-  padding: "0.75rem 1rem",
-  border: `1px solid ${color.border}`,
-  borderRadius: radius.md,
-  "& legend": { fontWeight: 600, padding: "0 0.25rem" },
-});
+const modeStyle = css({ display: "grid", gap: "0.5rem" });
 
 const modeOptionStyle = css({
   display: "flex",
@@ -522,18 +502,4 @@ const modeOptionStyle = css({
   fontSize: "0.9rem",
   cursor: "pointer",
   "& input": { marginTop: "0.3rem" },
-});
-
-const postLinkStyle = css({
-  margin: 0,
-  fontSize: "0.85rem",
-  overflowWrap: "anywhere",
-  color: color.muted,
-});
-
-const shareStyle = css({
-  display: "flex",
-  flexWrap: "wrap",
-  alignItems: "center",
-  gap: "0.75rem",
 });
