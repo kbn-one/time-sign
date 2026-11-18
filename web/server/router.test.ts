@@ -1,9 +1,15 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 
 import config from "../../cloudflare.config.ts";
-import { isMoment, parsePost, postHref, postMeta } from "../client/site.ts";
+import {
+  CARD_TEMPLATE,
+  isMoment,
+  parsePost,
+  POST_META,
+  shareHref,
+} from "../client/site.ts";
 import { headersFile } from "./headers.ts";
-import router, { entryPoints, WORKER_PATHS } from "./router.tsx";
+import router, { API_PATHS, entryPoints } from "./router.tsx";
 
 Deno.test("GET / is the landing page", async () => {
   const res = await router.fetch(new Request("http://localhost/"));
@@ -47,9 +53,9 @@ Deno.test("GET /static/app.css", async () => {
   await res.body?.cancel();
 });
 
-Deno.test("Cloudflare sends exactly the Worker's paths to the Worker", () => {
+Deno.test("Cloudflare sends exactly the API paths to the Worker", () => {
   const worker = typeof config === "function" ? undefined : config.worker;
-  assertEquals(worker?.assets?.runWorkerFirst, WORKER_PATHS);
+  assertEquals(worker?.assets?.runWorkerFirst, API_PATHS);
 });
 
 const SITE = "https://time-sign.kbn.one";
@@ -60,60 +66,33 @@ function metaContent(html: string, key: string): string | undefined {
     ?.[1];
 }
 
-Deno.test("GET /post is the share page, with every card tag", async () => {
-  const res = await router.fetch(new Request("http://localhost/post"));
-  assertEquals(res.status, 200);
-  const html = await res.text();
-  assertEquals(metaContent(html, "twitter:card"), "summary");
-  assertEquals(metaContent(html, "twitter:player"), `${SITE}/embed`);
-  assertEquals(metaContent(html, "twitter:player:width"), "480");
-  assertEquals(metaContent(html, "twitter:player:height"), "480");
-  assertEquals(
-    metaContent(html, "twitter:image"),
-    `${SITE}/static/card.png`,
-  );
-  assertEquals(metaContent(html, "og:image"), `${SITE}/static/card.png`);
-  assertStringIncludes(html, "/assets/islands/sealed_message");
-  // The Worker rewrites these tags in the static file, so every one must be in it.
-  for (const key of Object.keys(postMeta(null).tags)) {
-    assert(metaContent(html, key) !== undefined, key);
+Deno.test("GET /post is one page for every link, with a plain card", async () => {
+  for (const path of ["/post", "/post?t=2030-01-01T00:00:00Z&c=AAAA"]) {
+    const res = await router.fetch(new Request(`http://localhost${path}`));
+    assertEquals(res.status, 200);
+    const html = await res.text();
+    assertStringIncludes(html, `<title>${POST_META.title}</title>`);
+    for (const [key, content] of Object.entries(POST_META.tags)) {
+      assertEquals(metaContent(html, key), content, key);
+    }
+    assertStringIncludes(html, "/assets/islands/sealed_message");
   }
 });
 
-Deno.test("GET /post?t= names the moment; a private link gets a summary card", async () => {
-  const t = "2030-01-01T00:00:00Z";
-  const html = await (await router.fetch(
-    new Request(`http://localhost/post?t=${t}`),
-  )).text();
-  assertStringIncludes(
-    html,
-    "<title>A message sealed until 2030-01-01 00:00:00 UTC</title>",
+Deno.test("static/og-card.svg is og.kbn.one's template: player and reader get #c=", async () => {
+  const res = await router.fetch(
+    new Request("http://localhost/static/og-card.svg"),
   );
-  assertEquals(metaContent(html, "twitter:card"), "summary");
-  // Not a moment the server issues keys for: no moment in the card.
-  const plain = await (await router.fetch(
-    new Request("http://localhost/post?t=2030-01-01&c=AAAA"),
-  )).text();
-  assertEquals(metaContent(plain, "twitter:card"), "summary");
-  assertEquals(metaContent(plain, "twitter:player"), `${SITE}/embed`);
-});
-
-Deno.test("GET /post?t=&c= is an X player card that carries the ciphertext", async () => {
-  const t = "2030-01-01T00:00:00Z";
-  const c = "g6JjdMTg-_AA";
-  const html = await (await router.fetch(
-    new Request(`http://localhost/post?t=${t}&c=${c}`),
-  )).text();
-  assertEquals(metaContent(html, "twitter:card"), "player");
-  assertEquals(
-    metaContent(html, "twitter:player"),
-    `${SITE}/embed?t=${t}&amp;c=${c}`,
-  );
-  // Anything but base64url is not put in the card.
-  const bad = await (await router.fetch(
-    new Request(`http://localhost/post?t=${t}&c=%22%3E%3Cscript%3E`),
-  )).text();
-  assertEquals(metaContent(bad, "twitter:card"), "summary");
+  assertEquals(res.status, 200);
+  const svg = await res.text();
+  const json = svg.match(/<!\[CDATA\[([\s\S]*?)\]\]>/)?.[1];
+  const config = JSON.parse(json ?? "null");
+  assertEquals(config.url, `${SITE}/post?t={{t}}#c={{c}}`);
+  assertEquals(config.player.url, `${SITE}/embed?t={{t}}#c={{c}}`);
+  assertEquals([config.player.width, config.player.height], [480, 480]);
+  assertStringIncludes(svg, "{{when}}");
+  assert(entryPoints.includes("/static/og-card.svg"));
+  assertEquals(CARD_TEMPLATE, "time-sign.kbn.one/static/og-card.svg");
 });
 
 Deno.test("GET /embed is frameable by X, bare and unindexed", async () => {
@@ -143,26 +122,31 @@ Deno.test("GET /static/card.png is the square card image", async () => {
   assert(entryPoints.includes("/static/card.png"));
 });
 
-Deno.test("a /post link carries the moment in the query, the message after # or in the query", () => {
+Deno.test("share links: private on this site after #, X cards through og.kbn.one", () => {
+  const moment = "2030-01-01T00:00:00Z";
   const ciphertext = crypto.getRandomValues(new Uint8Array(300));
-  const href = postHref(SITE, "2030-01-01T00:00:00Z", ciphertext);
-  const url = new URL(href);
-  assertEquals(url.pathname + url.search, "/post?t=2030-01-01T00:00:00Z");
+  const c = ciphertext.toBase64({ alphabet: "base64url", omitPadding: true });
+
+  const priv = new URL(shareHref(SITE, moment, ciphertext));
   assertEquals(
-    parsePost(url.search, url.hash),
-    { moment: "2030-01-01T00:00:00Z", ciphertext },
+    priv.origin + priv.pathname + priv.search,
+    `${SITE}/post?t=${moment}`,
   );
-  const card = new URL(
-    postHref(SITE, "2030-01-01T00:00:00Z", ciphertext, "card"),
-  );
-  assertEquals(card.hash, "");
-  assertEquals(
-    parsePost(card.search, card.hash),
-    { moment: "2030-01-01T00:00:00Z", ciphertext },
-  );
-  assert("error" in parsePost("?t=2030-01-01", url.hash));
-  assert("error" in parsePost(url.search, ""));
-  assert("error" in parsePost(url.search, "#c=***"));
+  assertEquals(parsePost(priv.search, priv.hash), { moment, ciphertext });
+
+  const card = new URL(shareHref(SITE, moment, ciphertext, "card"));
+  assertEquals(card.origin + card.pathname, "https://og.kbn.one/share");
+  assertEquals(card.searchParams.get("tmpl"), CARD_TEMPLATE);
+  assertEquals(card.searchParams.get("t"), moment);
+  assertEquals(card.searchParams.get("when"), "2030-01-01 00:00:00 UTC");
+  assertEquals(card.searchParams.get("c"), c);
+  // What og.kbn.one sends the reader and the player to: the ciphertext after #.
+  const dest = new URL(`${SITE}/post?t=${encodeURIComponent(moment)}#c=${c}`);
+  assertEquals(parsePost(dest.search, dest.hash), { moment, ciphertext });
+
+  assert("error" in parsePost("?t=2030-01-01", priv.hash));
+  assert("error" in parsePost(priv.search, ""));
+  assert("error" in parsePost(priv.search, "#c=***"));
   assert(isMoment("2030-01-01T00:00:10Z"));
   assert(!isMoment("2030-01-01T00:00:07Z"));
 });

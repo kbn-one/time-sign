@@ -2,7 +2,7 @@ import { type Handle } from "remix/component";
 
 import { SealedMessage } from "../islands/sealed_message.tsx";
 
-/** The page's `<title>` and card come from `postMeta()` (`site.ts`), by the moment in `?t=`. */
+/** One page for every link: its `<title>` and card are `POST_META` (`site.ts`). */
 export const hydrate = true;
 
 export default function Post(_handle: Handle) {

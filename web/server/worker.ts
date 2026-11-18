@@ -2,9 +2,7 @@
  * The Cloudflare Workers entry: the API only.
  *
  * Cloudflare serves the static build (`web/dist`) as static assets and sends only the API paths
- * here, plus `/post` (`assets.runWorkerFirst` in `cloudflare.config.ts`). `/post` is the static
- * page with its card meta rewritten for `?t=` (and `?c=`, for an X-card link), so a crawler (X's,
- * for the player card) sees them without running any script.
+ * here (`assets.runWorkerFirst` in `cloudflare.config.ts`).
  *
  * Workers can't compile Wasm from bytes at runtime, so the .wasm file is imported as a precompiled
  * `WebAssembly.Module` (a `wasm` module in the upload, arranged by `cf_build.ts`) and wired to the
@@ -15,8 +13,6 @@
 import wasmModule from "../../lib/rs_lib.wasm";
 import * as glue from "../../lib/rs_lib.internal.js";
 import { type Bindings, createApi } from "./api.ts";
-import { routes } from "../client/routes.ts";
-import { postMeta } from "../client/site.ts";
 
 const instance = new WebAssembly.Instance(wasmModule as WebAssembly.Module, {
   "./rs_lib.internal.js": glue as unknown as WebAssembly.ModuleImports,
@@ -34,55 +30,14 @@ let router: ReturnType<typeof createApi> | undefined;
 interface ExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
 }
-interface Element {
-  getAttribute(name: string): string | null;
-  setAttribute(name: string, value: string): void;
-  setInnerContent(content: string): void;
-}
-declare class HTMLRewriter {
-  on(selector: string, handlers: { element(element: Element): void }): this;
-  transform(response: Response): Response;
-}
 const edgeCache = (caches as unknown as { default: Cache }).default;
-
-type Env = Bindings & {
-  ASSETS: { fetch(request: Request): Promise<Response> };
-};
-
-/** `/post`: the static page, its `<title>` and card meta written for `?t=`. */
-async function post(request: Request, env: Env): Promise<Response> {
-  const url = new URL(request.url);
-  const page = await env.ASSETS.fetch(
-    new Request(new URL(routes.post.href(), url), request),
-  );
-  if (!page.ok) return page;
-  const meta = postMeta(url.searchParams.get("t"), url.searchParams.get("c"));
-  return new HTMLRewriter()
-    .on("title", {
-      element(element) {
-        element.setInnerContent(meta.title);
-      },
-    })
-    .on("meta[name], meta[property]", {
-      element(element) {
-        const key = element.getAttribute("name") ??
-          element.getAttribute("property");
-        const content = key ? meta.tags[key] : undefined;
-        if (content !== undefined) element.setAttribute("content", content);
-      },
-    })
-    .transform(page);
-}
 
 export default {
   async fetch(
     request: Request,
-    env: Env,
+    env: Bindings,
     ctx: ExecutionContext,
   ): Promise<Response> {
-    if (new URL(request.url).pathname === routes.post.href()) {
-      return post(request, env);
-    }
     router ??= createApi(glue.extract_usk, env);
     if (request.method !== "GET") return router.fetch(request);
 

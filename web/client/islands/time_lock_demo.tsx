@@ -13,7 +13,7 @@ import { clientEntry, css, type Handle, on } from "remix/component";
 
 import "../share_buttons.ts";
 import { routes } from "../routes.ts";
-import { type LinkMode, postHref } from "../site.ts";
+import { type LinkMode, shareHref } from "../site.ts";
 import { fetchKey, formatDuration, loadClient } from "../time_sign_client.ts";
 import { color, radius } from "../tokens.ts";
 
@@ -38,12 +38,12 @@ const LINK_MODES: [mode: LinkMode, label: string, explanation: string][] = [
   [
     "private",
     "Private link",
-    "The ciphertext rides after the # and never reaches this server. On X it shows as a plain link card; the message is read by opening the link.",
+    "The ciphertext rides after the # and never reaches any server. On X it shows as a plain link card; the message is read by opening the link.",
   ],
   [
     "card",
-    "For X (player card)",
-    "The ciphertext rides in the query, so X's card can count down and then open the message right in the post. It does reach this server — which holds the master key and could open it early, if you do not trust it.",
+    "For X (player card, via og.kbn.one)",
+    "On X the card counts down and then opens the message right in the post. og.kbn.one, which writes the card, sees the ciphertext; this server, which holds the master key, still does not.",
   ],
 ];
 
@@ -323,9 +323,9 @@ function Status(
   };
 }
 
-/** The `/post` link for a sealed message, on this origin. */
+/** The link to share a sealed message by, of the chosen kind. */
 function postLink(sealed: Sealed, mode: LinkMode): string {
-  return postHref(
+  return shareHref(
     location.origin,
     sealed.id,
     Uint8Array.fromBase64(sealed.ciphertext),

@@ -1,9 +1,10 @@
 /**
- * The X player card for a post: `/embed?t=<moment>&c=<ciphertext>`, in X's iframe.
+ * The X player card for a post: `/embed?t=<moment>#c=<ciphertext>`, in X's iframe.
  *
- * The iframe gets only what the card's `twitter:player` URL says. An X-card link puts the
- * ciphertext there, so once the moment has passed the card asks `/at/<moment>` for the key and
- * opens the message right in the post. Without one it can only count down and point at the link.
+ * The iframe gets only what the card's `twitter:player` URL says — og.kbn.one writes it from
+ * `static/og-card.svg`, with the ciphertext after `#` so it never reaches this server. Once the
+ * moment has passed the card asks `/at/<moment>` for the key and opens the message right in the
+ * post. Without one it can only count down and point at the link.
  * It fills the frame (245–500 px wide), and links open in a new tab: the frame is sandboxed, with
  * popups allowed and no modals or forms.
  */
@@ -65,7 +66,7 @@ export const SealedCard = clientEntry(
 
     handle.queueTask(() => {
       const t = new URLSearchParams(location.search).get("t");
-      const parsed = parsePost(location.search, "");
+      const parsed = parsePost(location.search, location.hash);
       if ("error" in parsed) {
         // No ciphertext (a private link's card): a countdown only, if there is a moment at all.
         if (isMoment(t)) {
