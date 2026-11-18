@@ -957,6 +957,15 @@ function encodeSlice(object, byteParts) {
   throw new Error("Cannot safely encode value into messagepack");
 }
 
+// client/time_id.ts
+var TIME_STEP_MS = 1e4;
+function timeId(at) {
+  const ms = typeof at === "string" ? Date.parse(at) : Number(at);
+  if (!Number.isFinite(ms)) throw new RangeError(`Invalid date: ${at}`);
+  const rounded = Math.ceil(ms / TIME_STEP_MS) * TIME_STEP_MS;
+  return new Date(rounded).toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
 // client/mod.ts
 function missingFeature() {
   if (typeof Deno != "undefined") return null;
@@ -1010,7 +1019,9 @@ function aesDecrypt(key, iv, encrypted) {
   }, key, encrypted);
 }
 export {
+  TIME_STEP_MS,
   decrypt,
   encrypt,
-  missingFeature
+  missingFeature,
+  timeId
 };

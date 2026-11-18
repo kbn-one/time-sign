@@ -10,19 +10,19 @@ export const description =
 export const hydrate = false;
 
 const example =
-  `import { decrypt, encrypt } from "https://raw.githubusercontent.com/kbn-one/time-sign/main/client/mod.ts";
+  `import { decrypt, encrypt, timeId } from "https://raw.githubusercontent.com/kbn-one/time-sign/main/client/mod.ts";
 
 const server = "https://time-sign.kbn.one";
-const time = "2030-01-01";
+const id = timeId("2030-01-01"); // "2030-01-01T00:00:00Z"
 
 const mpk = new Uint8Array(
   await (await fetch(server + "/master_pk")).arrayBuffer(),
 );
-const enc = await encrypt(mpk, time, new TextEncoder().encode("secret"));
+const enc = await encrypt(mpk, id, new TextEncoder().encode("secret"));
 
-// after \`time\` has passed
+// after the moment has passed
 const usk = new Uint8Array(
-  await (await fetch(server + \`/at/\${time}\`)).arrayBuffer(),
+  await (await fetch(server + \`/at/\${id}\`)).arrayBuffer(),
 );
 console.log(new TextDecoder().decode(await decrypt(usk, enc)));`;
 
@@ -50,7 +50,8 @@ export default function Home(_handle: Handle) {
         <ol>
           <li>
             The server holds an identity-based encryption (IBE) master key pair.
-            The identity is a date string, such as <code>2030-01-01</code>.
+            The identity is a moment, spelled one way and rounded up to 10
+            seconds: <code>2030-01-01T00:00:00Z</code>.
           </li>
           <li>
             You encrypt locally with the master public key and the date. Only
@@ -76,15 +77,22 @@ export default function Home(_handle: Handle) {
           </dt>
           <dd>The master public key, as raw bytes.</dd>
           <dt>
-            <code>GET /at/&lt;date&gt;</code>
+            <code>GET /at/&lt;moment&gt;</code>
           </dt>
           <dd>
-            The user secret key for <code>&lt;date&gt;</code> (any string{" "}
-            <code>Date.parse</code>{" "}
-            accepts) once it has passed, as raw bytes. Before that, the text
+            The user secret key for <code>&lt;moment&gt;</code>{" "}
+            once it has passed, as raw bytes; before that, the text{" "}
+            <code>It is not the time</code>. Keys are issued every 10 seconds,
+            for one spelling: <code>YYYY-MM-DDTHH:MM:SSZ</code>{" "}
+            in UTC. Any other date <code>Date.parse</code> accepts is a{" "}
+            <code>301</code> to that moment rounded up (<code>
+              /at/2030-01-01
+            </code>{" "}
+            →{" "}
+            <code>/at/2030-01-01T00:00:00Z</code>), so a key is never released
+            early. Encrypt for that spelling: the client's <code>timeId()</code>
             {" "}
-            <code>It is not the time</code>. An unparseable date is{" "}
-            <code>400</code>.
+            gives it. An unparseable date is <code>400</code>.
           </dd>
         </dl>
         <p>CORS is open: any origin may call the API from a browser.</p>

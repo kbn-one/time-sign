@@ -1,6 +1,11 @@
 /**
  * The API: `GET /master_pk` and `GET /at/<date>`.
  *
+ * `/at/<date>` issues keys every 10 seconds only, for one spelling of the moment (`timeId` in
+ * `client/time_id.ts`, rounded up): any other spelling is a `301` to it. So every request for a
+ * moment lands on one URL, and its answer can be cached — the key for a past moment for good, the
+ * refusal for a future one until the moment comes.
+ *
  * A router of its own, because it is deployed on its own: Cloudflare serves the pages as static
  * assets and sends only {@link API_PATHS} to the Worker (`worker.ts`), which answers with this.
  * Locally `router.tsx` makes the same split.
@@ -9,6 +14,7 @@
 import { cors } from "remix/middleware/cors";
 import { createRouter, type Middleware, type Router } from "remix/router";
 
+import { timeId } from "../../client/time_id.ts";
 import { routes } from "../client/routes.ts";
 
 /**
@@ -34,6 +40,9 @@ type ExtractUsk = (sk: Uint8Array, id: string) => Uint8Array;
 
 const TEXT = { "content-type": "text/plain; charset=UTF-8" };
 
+/** For answers that never change: a redirect to a moment's identity, the key for a past one. */
+const IMMUTABLE = "public, max-age=31536000, immutable";
+
 function notFound(): Response {
   return new Response("404 Not Found", { status: 404, headers: TEXT });
 }
@@ -53,6 +62,23 @@ const notFoundAndHead: Middleware = async (context, next) => {
     });
   }
   return response;
+};
+
+/**
+ * `Access-Control-Allow-Origin: *` on every response, whether or not the request carried an
+ * `Origin`. `cors()` only answers requests that do, and a cached response has to be right for
+ * whoever it is served to next.
+ */
+const allowAnyOrigin: Middleware = async (_context, next) => {
+  const response = await next();
+  if (response.headers.has("access-control-allow-origin")) return response;
+  const headers = new Headers(response.headers);
+  headers.set("access-control-allow-origin", "*");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 };
 
 /**
@@ -79,7 +105,7 @@ const AT_PATH = /^\/at\/([^/]+)$/;
 export function createApi(extract_usk: ExtractUsk, env: Bindings): Router {
   const router = createRouter({
     // CORS allows any origin on every path: both answers are public by design.
-    middleware: [cors(), notFoundAndHead],
+    middleware: [allowAnyOrigin, cors(), notFoundAndHead],
     // route-pattern will not match a segment with a malformed escape such as
     // `%ZZ`; it is still a (bad) date, so it gets the date route's 400.
     defaultHandler({ method, url }) {
@@ -96,12 +122,26 @@ export function createApi(extract_usk: ExtractUsk, env: Bindings): Router {
     if (isNaN(at_date)) {
       return new Response("Invalid date", { status: 400, headers: TEXT });
     }
-    if (Date.now() < at_date) {
-      return new Response("It is not the time");
+    const id = timeId(at_date);
+    if (at !== id) {
+      return new Response(null, {
+        status: 301,
+        headers: { location: `/at/${id}`, "cache-control": IMMUTABLE },
+      });
+    }
+    const wait = at_date - Date.now();
+    if (wait > 0) {
+      return new Response("It is not the time", {
+        headers: {
+          "cache-control": `public, max-age=${Math.ceil(wait / 1000)}`,
+        },
+      });
     }
     const sk = Uint8Array.fromBase64(env.IBKEM_SECRET_KEY);
-    const usk = extract_usk(sk, at);
-    return new Response(usk as Uint8Array<ArrayBuffer>);
+    const usk = extract_usk(sk, id);
+    return new Response(usk as Uint8Array<ArrayBuffer>, {
+      headers: { "cache-control": IMMUTABLE },
+    });
   }
 
   router.get(
