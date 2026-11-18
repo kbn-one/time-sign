@@ -51,10 +51,11 @@ const LINK_MODES: [mode: LinkMode, label: string, explanation: string][] = [
 const STEP_MS = 10_000;
 
 const PRESETS: [label: string, ms: number][] = [
-  ["in 10 seconds", 10_000],
   ["in 1 minute", 60_000],
+  ["in 10 minutes", 600_000],
   ["in 1 hour", 3_600_000],
-  ["1 day ago", -86_400_000],
+  ["in 24 hours", 86_400_000],
+  ["in 1 week", 604_800_000],
 ];
 
 export const TimeLockDemo = clientEntry(
