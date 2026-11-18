@@ -3,8 +3,8 @@
  *
  * Cloudflare serves the static build (`web/dist`) as static assets and sends only the API paths
  * here, plus `/post` (`assets.runWorkerFirst` in `cloudflare.config.ts`). `/post` is the static
- * page with its card meta rewritten for the moment in `?t=`, so a crawler (X's, for the player
- * card) sees that moment without running any script.
+ * page with its card meta rewritten for `?t=` (and `?c=`, for an X-card link), so a crawler (X's,
+ * for the player card) sees them without running any script.
  *
  * Workers can't compile Wasm from bytes at runtime, so the .wasm file is imported as a precompiled
  * `WebAssembly.Module` (a `wasm` module in the upload, arranged by `cf_build.ts`) and wired to the
@@ -56,7 +56,7 @@ async function post(request: Request, env: Env): Promise<Response> {
     new Request(new URL(routes.post.href(), url), request),
   );
   if (!page.ok) return page;
-  const meta = postMeta(url.searchParams.get("t"));
+  const meta = postMeta(url.searchParams.get("t"), url.searchParams.get("c"));
   return new HTMLRewriter()
     .on("title", {
       element(element) {

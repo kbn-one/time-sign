@@ -60,11 +60,11 @@ function metaContent(html: string, key: string): string | undefined {
     ?.[1];
 }
 
-Deno.test("GET /post is the share page, with a player card", async () => {
+Deno.test("GET /post is the share page, with every card tag", async () => {
   const res = await router.fetch(new Request("http://localhost/post"));
   assertEquals(res.status, 200);
   const html = await res.text();
-  assertEquals(metaContent(html, "twitter:card"), "player");
+  assertEquals(metaContent(html, "twitter:card"), "summary");
   assertEquals(metaContent(html, "twitter:player"), `${SITE}/embed`);
   assertEquals(metaContent(html, "twitter:player:width"), "480");
   assertEquals(metaContent(html, "twitter:player:height"), "480");
@@ -80,7 +80,7 @@ Deno.test("GET /post is the share page, with a player card", async () => {
   }
 });
 
-Deno.test("GET /post?t= names the moment in the card", async () => {
+Deno.test("GET /post?t= names the moment; a private link gets a summary card", async () => {
   const t = "2030-01-01T00:00:00Z";
   const html = await (await router.fetch(
     new Request(`http://localhost/post?t=${t}`),
@@ -89,12 +89,31 @@ Deno.test("GET /post?t= names the moment in the card", async () => {
     html,
     "<title>A message sealed until 2030-01-01 00:00:00 UTC</title>",
   );
-  assertEquals(metaContent(html, "twitter:player"), `${SITE}/embed?t=${t}`);
-  // Not a moment the server issues keys for: the plain card.
+  assertEquals(metaContent(html, "twitter:card"), "summary");
+  // Not a moment the server issues keys for: no moment in the card.
   const plain = await (await router.fetch(
-    new Request("http://localhost/post?t=2030-01-01"),
+    new Request("http://localhost/post?t=2030-01-01&c=AAAA"),
   )).text();
+  assertEquals(metaContent(plain, "twitter:card"), "summary");
   assertEquals(metaContent(plain, "twitter:player"), `${SITE}/embed`);
+});
+
+Deno.test("GET /post?t=&c= is an X player card that carries the ciphertext", async () => {
+  const t = "2030-01-01T00:00:00Z";
+  const c = "g6JjdMTg-_AA";
+  const html = await (await router.fetch(
+    new Request(`http://localhost/post?t=${t}&c=${c}`),
+  )).text();
+  assertEquals(metaContent(html, "twitter:card"), "player");
+  assertEquals(
+    metaContent(html, "twitter:player"),
+    `${SITE}/embed?t=${t}&amp;c=${c}`,
+  );
+  // Anything but base64url is not put in the card.
+  const bad = await (await router.fetch(
+    new Request(`http://localhost/post?t=${t}&c=%22%3E%3Cscript%3E`),
+  )).text();
+  assertEquals(metaContent(bad, "twitter:card"), "summary");
 });
 
 Deno.test("GET /embed is frameable by X, bare and unindexed", async () => {
@@ -124,13 +143,21 @@ Deno.test("GET /static/card.png is the square card image", async () => {
   assert(entryPoints.includes("/static/card.png"));
 });
 
-Deno.test("a /post link carries the moment in the query and the message in the fragment", () => {
+Deno.test("a /post link carries the moment in the query, the message after # or in the query", () => {
   const ciphertext = crypto.getRandomValues(new Uint8Array(300));
   const href = postHref(SITE, "2030-01-01T00:00:00Z", ciphertext);
   const url = new URL(href);
   assertEquals(url.pathname + url.search, "/post?t=2030-01-01T00:00:00Z");
   assertEquals(
     parsePost(url.search, url.hash),
+    { moment: "2030-01-01T00:00:00Z", ciphertext },
+  );
+  const card = new URL(
+    postHref(SITE, "2030-01-01T00:00:00Z", ciphertext, "card"),
+  );
+  assertEquals(card.hash, "");
+  assertEquals(
+    parsePost(card.search, card.hash),
     { moment: "2030-01-01T00:00:00Z", ciphertext },
   );
   assert("error" in parsePost("?t=2030-01-01", url.hash));

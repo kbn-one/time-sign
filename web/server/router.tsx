@@ -82,7 +82,8 @@ pages.get(routes.demo, pageAction(Demo));
 // The card names the moment from `?t=`. The static build renders it without one; on Cloudflare the
 // Worker writes the same `postMeta(t)` into that file (`worker.ts`).
 pages.get(routes.post, (context) => {
-  const meta = postMeta(context.url.searchParams.get("t"));
+  const query = context.url.searchParams;
+  const meta = postMeta(query.get("t"), query.get("c"));
   return context.render(
     <Layout
       title={meta.title}

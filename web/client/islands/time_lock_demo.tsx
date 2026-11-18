@@ -13,7 +13,7 @@ import { clientEntry, css, type Handle, on } from "remix/component";
 
 import "../share_buttons.ts";
 import { routes } from "../routes.ts";
-import { postHref } from "../site.ts";
+import { type LinkMode, postHref } from "../site.ts";
 import { fetchKey, formatDuration, loadClient } from "../time_sign_client.ts";
 import { color, radius } from "../tokens.ts";
 
@@ -32,6 +32,20 @@ type Outcome =
   | { kind: "error"; text: string };
 
 const STORAGE_KEY = "time-sign-demo";
+
+/** The two kinds of share link, and what choosing one means. */
+const LINK_MODES: [mode: LinkMode, label: string, explanation: string][] = [
+  [
+    "private",
+    "Private link",
+    "The ciphertext rides after the # and never reaches this server. On X it shows as a plain link card; the message is read by opening the link.",
+  ],
+  [
+    "card",
+    "For X (player card)",
+    "The ciphertext rides in the query, so X's card can count down and then open the message right in the post. It does reach this server — which holds the master key and could open it early, if you do not trust it.",
+  ],
+];
 
 /** Keys are issued every 10 seconds (`TIME_STEP_MS` in `client/time_id.ts`). */
 const STEP_MS = 10_000;
@@ -52,6 +66,8 @@ export const TimeLockDemo = clientEntry(
     /** Bumped to remount the date input when a preset replaces its value. */
     let momentKey = 0;
     let sealed: Sealed | null = null;
+    /** Where the share link puts the ciphertext — see `LINK_MODES`. */
+    let mode: LinkMode = "private";
     let outcome: Outcome = { kind: "none" };
     let now = 0;
 
@@ -229,11 +245,31 @@ export const TimeLockDemo = clientEntry(
                     Forget
                   </button>
                 </div>
+                <fieldset mix={modeStyle}>
+                  <legend>Share link</legend>
+                  {LINK_MODES.map(([value, label, explanation]) => (
+                    <label key={value} mix={modeOptionStyle}>
+                      <input
+                        type="radio"
+                        name="link-mode"
+                        value={value}
+                        defaultChecked={mode === value}
+                        mix={on("change", () => {
+                          mode = value;
+                          handle.update();
+                        })}
+                      />
+                      <span>
+                        <strong>{label}</strong>
+                        <br />
+                        <span mix={mutedStyle}>{explanation}</span>
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
                 <p mix={postLinkStyle}>
-                  Post link (the message rides in the <code>#</code>{" "}
-                  part, which never reaches the server):{" "}
-                  <a href={postLink(sealed)} target="_blank">
-                    {postLink(sealed)}
+                  <a href={postLink(sealed, mode)} target="_blank">
+                    {postLink(sealed, mode)}
                   </a>
                 </p>
               </>
@@ -247,7 +283,7 @@ export const TimeLockDemo = clientEntry(
             {sealed ? "Share the sealed message:" : "Share this demo:"}
           </span>
           {/* Empty `url` shares this page; with a sealed message, its post link. */}
-          <share-buttons url={sealed ? postLink(sealed) : ""} />
+          <share-buttons url={sealed ? postLink(sealed, mode) : ""} />
         </section>
       </div>
     );
@@ -288,11 +324,12 @@ function Status(
 }
 
 /** The `/post` link for a sealed message, on this origin. */
-function postLink(sealed: Sealed): string {
+function postLink(sealed: Sealed, mode: LinkMode): string {
   return postHref(
     location.origin,
     sealed.id,
     Uint8Array.fromBase64(sealed.ciphertext),
+    mode,
   );
 }
 
@@ -388,6 +425,25 @@ const openedStyle = css({
 });
 
 const errorStyle = css({ margin: 0, color: color.danger });
+
+const modeStyle = css({
+  display: "grid",
+  gap: "0.5rem",
+  margin: 0,
+  padding: "0.75rem 1rem",
+  border: `1px solid ${color.border}`,
+  borderRadius: radius.md,
+  "& legend": { fontWeight: 600, padding: "0 0.25rem" },
+});
+
+const modeOptionStyle = css({
+  display: "flex",
+  alignItems: "start",
+  gap: "0.5rem",
+  fontSize: "0.9rem",
+  cursor: "pointer",
+  "& input": { marginTop: "0.3rem" },
+});
 
 const postLinkStyle = css({
   margin: 0,

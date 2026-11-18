@@ -32,9 +32,24 @@ export interface PageMeta {
   tags: Record<string, string>;
 }
 
-/** The meta of `/post` for a moment — or for none, which is what the static build writes. */
-export function postMeta(t: string | null): PageMeta {
+/** A base64url ciphertext as it may appear in a link: nothing else, and not absurdly long. */
+function isCiphertextParam(c: string | null): c is string {
+  return !!c && c.length <= 8192 && /^[A-Za-z0-9_-]+$/.test(c);
+}
+
+/**
+ * The meta of `/post` for the link's query — or for none, which is what the static build writes.
+ *
+ * With the ciphertext in the query (`?t=…&c=…`, an X-card link) the card is a player:
+ * `/embed?t=…&c=…`, which opens the message inside the card once the moment has passed. Without
+ * it (a private link, ciphertext after `#`) the card cannot reach the message, so it is a plain
+ * `summary` card whose click opens the link itself. Every tag is present either way, because the
+ * Worker rewrites the static file's tags rather than adding any (`worker.ts`); X ignores the
+ * `twitter:player*` tags of a card that is not a player.
+ */
+export function postMeta(t: string | null, c: string | null = null): PageMeta {
   const moment = isMoment(t) ? t : null;
+  const inQuery = moment !== null && isCiphertextParam(c);
   const when = moment ? formatUtc(moment) : null;
   const title = when
     ? `A message sealed until ${when}`
@@ -43,7 +58,7 @@ export function postMeta(t: string | null): PageMeta {
     ? `Encrypted with time-lock encryption: nobody can read it before ${when}, not even the sender.`
     : "Encrypted with time-lock encryption: nobody can read it before its moment, not even the sender.";
   const player = `${SITE_ORIGIN}${routes.embed.href()}${
-    moment ? `?t=${moment}` : ""
+    moment ? `?t=${moment}${inQuery ? `&c=${c}` : ""}` : ""
   }`;
   return {
     title,
@@ -54,7 +69,7 @@ export function postMeta(t: string | null): PageMeta {
       "og:title": title,
       "og:description": description,
       "og:image": CARD_IMAGE,
-      "twitter:card": "player",
+      "twitter:card": inQuery ? "player" : "summary",
       "twitter:title": title,
       "twitter:description": description,
       "twitter:image": CARD_IMAGE,
@@ -70,27 +85,36 @@ export function formatUtc(moment: string): string {
   return moment.replace("T", " ").replace("Z", " UTC");
 }
 
+/** Where a link puts the ciphertext. */
+export type LinkMode = "card" | "private";
+
 /**
- * The link that carries a sealed message: the moment in the query, where the server and card
- * crawlers see it, and the ciphertext in the fragment, which never leaves the reader's browser.
+ * The link that carries a sealed message. The moment is always in the query, where the server and
+ * card crawlers see it. The ciphertext is in the query too for an X-card link (`card`), so the
+ * card can open the message — which means it reaches this server — or after `#` for a private
+ * link (`private`), which never leaves the reader's browser.
  */
 export function postHref(
   origin: string,
   moment: string,
   ciphertext: Uint8Array,
+  mode: LinkMode = "private",
 ): string {
   const c = ciphertext.toBase64({ alphabet: "base64url", omitPadding: true });
-  return `${origin}${routes.post.href()}?t=${moment}#c=${c}`;
+  const base = `${origin}${routes.post.href()}?t=${moment}`;
+  return mode === "card" ? `${base}&c=${c}` : `${base}#c=${c}`;
 }
 
-/** The moment and ciphertext a `/post` link carries, or what is wrong with it. */
+/** The moment and ciphertext a link carries (`c` from the query or the fragment), or what is wrong with it. */
 export function parsePost(
   search: string,
   hash: string,
 ): { moment: string; ciphertext: Uint8Array } | { error: string } {
-  const moment = new URLSearchParams(search).get("t");
+  const query = new URLSearchParams(search);
+  const moment = query.get("t");
   if (!isMoment(moment)) return { error: "This link has no valid moment." };
-  const c = new URLSearchParams(hash.replace(/^#/, "")).get("c");
+  const c = query.get("c") ??
+    new URLSearchParams(hash.replace(/^#/, "")).get("c");
   if (!c) return { error: "This link has no message in it." };
   try {
     return {
