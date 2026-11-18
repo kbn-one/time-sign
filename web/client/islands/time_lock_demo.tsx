@@ -240,8 +240,8 @@ export const TimeLockDemo = clientEntry(
           </button>
         </section>
 
-        <section mix={cardStyle} aria-label="Check">
-          <h2 mix={stepStyle}>2. Check</h2>
+        <section mix={cardStyle} aria-label="Preview">
+          <h2 mix={stepStyle}>2. Preview</h2>
           {sealed && (
             <p>
               Sealed for <strong>{formatLocal(sealed.id)}</strong>.
