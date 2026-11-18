@@ -49,6 +49,9 @@ type Outcome =
 
 const STORAGE_KEY = "time-sign-demo";
 
+/** Keys are issued every 10 seconds (`TIME_STEP_MS` in `client/time_id.ts`). */
+const STEP_MS = 10_000;
+
 const PRESETS: [label: string, ms: number][] = [
   ["in 10 seconds", 10_000],
   ["in 1 minute", 60_000],
@@ -72,15 +75,16 @@ export const TimeLockDemo = clientEntry(
     let outcome: Outcome = { kind: "none" };
     let now = 0;
 
-    function setMoment(ms: number) {
-      moment = toLocalInput(new Date(Date.now() + ms));
+    /** Sets the moment, rounded up to the 10 s step keys are issued on, and shows it. */
+    function setMoment(at: number) {
+      moment = toLocalInput(new Date(Math.ceil(at / STEP_MS) * STEP_MS));
       momentKey++;
     }
 
     // Client only: the static build has no "now", and no storage.
     handle.queueTask(() => {
       now = Date.now();
-      setMoment(60_000);
+      setMoment(Date.now() + 60_000);
       sealed = readSealed();
       handle.update();
       const timer = setInterval(() => {
@@ -180,6 +184,13 @@ export const TimeLockDemo = clientEntry(
                 on("input", (event) => {
                   moment = event.currentTarget.value;
                 }),
+                // Snap a typed moment onto the step once it is complete.
+                on("change", (event) => {
+                  const at = new Date(event.currentTarget.value).getTime();
+                  if (isNaN(at) || at % STEP_MS === 0) return;
+                  setMoment(at);
+                  handle.update();
+                }),
               ]}
             />
           </label>
@@ -190,7 +201,7 @@ export const TimeLockDemo = clientEntry(
                 mix={[
                   ghostButtonStyle,
                   on("click", () => {
-                    setMoment(ms);
+                    setMoment(Date.now() + ms);
                     handle.update();
                   }),
                 ]}
