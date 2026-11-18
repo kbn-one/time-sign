@@ -9,29 +9,13 @@
  * `timeId()`, rounded up to 10 seconds — when sealing, and opening asks for exactly that string. The sealed message is kept in `localStorage`.
  */
 
-import {
-  clientEntry,
-  css,
-  type Handle,
-  on,
-  type SerializableValue,
-} from "remix/component";
+import { clientEntry, css, type Handle, on } from "remix/component";
 
+import "../share_buttons.ts";
 import { routes } from "../routes.ts";
+import { postHref } from "../site.ts";
+import { fetchKey, formatDuration, loadClient } from "../time_sign_client.ts";
 import { color, radius } from "../tokens.ts";
-
-export interface TimeLockDemoProps {
-  /** Where the time-sign client is served. */
-  libSrc: string;
-  [key: string]: SerializableValue;
-}
-
-/** The part of `client/mod.ts` the demo uses. */
-interface TimeSignClient {
-  encrypt(mpk: Uint8Array, id: string, plain: Uint8Array): Promise<Uint8Array>;
-  decrypt(usk: Uint8Array, enc: Uint8Array): Promise<ArrayBuffer>;
-  timeId(at: Date | number | string): string;
-}
 
 interface Sealed {
   /** The moment, as the identity it was sealed for. */
@@ -61,11 +45,7 @@ const PRESETS: [label: string, ms: number][] = [
 
 export const TimeLockDemo = clientEntry(
   import.meta.url,
-  function TimeLockDemo(handle: Handle<TimeLockDemoProps>) {
-    let client: Promise<TimeSignClient> | undefined;
-    const loadClient = () =>
-      client ??= import(handle.props.libSrc) as Promise<TimeSignClient>;
-
+  function TimeLockDemo(handle: Handle) {
     let message = "Hello from the past.";
     /** The moment as a `datetime-local` value, in local time. */
     let moment = "";
@@ -127,17 +107,13 @@ export const TimeLockDemo = clientEntry(
       handle.update();
       try {
         const { decrypt } = await loadClient();
-        const response = await fetch(`/at/${encodeURIComponent(sealed.id)}`);
-        if (!response.ok) throw new Error(`at: ${response.status}`);
-        // Before the moment the answer is text; after it, the key's raw bytes.
-        if (response.headers.get("content-type")?.startsWith("text/")) {
-          await response.body?.cancel();
+        const answer = await fetchKey(sealed.id);
+        if (answer.kind === "locked") {
           now = Date.now();
           outcome = { kind: "locked" };
         } else {
-          const usk = new Uint8Array(await response.arrayBuffer());
           const plain = await decrypt(
-            usk,
+            answer.usk,
             Uint8Array.fromBase64(sealed.ciphertext),
           );
           outcome = { kind: "opened", text: new TextDecoder().decode(plain) };
@@ -253,10 +229,25 @@ export const TimeLockDemo = clientEntry(
                     Forget
                   </button>
                 </div>
+                <p mix={postLinkStyle}>
+                  Post link (the message rides in the <code>#</code>{" "}
+                  part, which never reaches the server):{" "}
+                  <a href={postLink(sealed)} target="_blank">
+                    {postLink(sealed)}
+                  </a>
+                </p>
               </>
             )
             : <p mix={mutedStyle}>Nothing sealed yet.</p>}
           <Status outcome={outcome} sealed={sealed} now={now} />
+        </section>
+
+        <section mix={shareStyle} aria-label="Share">
+          <span mix={mutedStyle}>
+            {sealed ? "Share the sealed message:" : "Share this demo:"}
+          </span>
+          {/* Empty `url` shares this page; with a sealed message, its post link. */}
+          <share-buttons url={sealed ? postLink(sealed) : ""} />
         </section>
       </div>
     );
@@ -296,6 +287,15 @@ function Status(
   };
 }
 
+/** The `/post` link for a sealed message, on this origin. */
+function postLink(sealed: Sealed): string {
+  return postHref(
+    location.origin,
+    sealed.id,
+    Uint8Array.fromBase64(sealed.ciphertext),
+  );
+}
+
 function readSealed(): Sealed | null {
   try {
     const value = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
@@ -320,16 +320,6 @@ function toLocalInput(date: Date): string {
 
 function formatLocal(iso: string): string {
   return new Date(iso).toLocaleString();
-}
-
-function formatDuration(ms: number): string {
-  const s = Math.ceil(ms / 1000);
-  if (s < 60) return `${s} s`;
-  if (s < 3600) return `${Math.floor(s / 60)} min ${s % 60} s`;
-  const h = Math.floor(s / 3600);
-  return h < 48
-    ? `${h} h ${Math.floor((s % 3600) / 60)} min`
-    : `${Math.floor(h / 24)} days`;
 }
 
 const rootStyle = css({ display: "grid", gap: "1.25rem" });
@@ -398,3 +388,17 @@ const openedStyle = css({
 });
 
 const errorStyle = css({ margin: 0, color: color.danger });
+
+const postLinkStyle = css({
+  margin: 0,
+  fontSize: "0.85rem",
+  overflowWrap: "anywhere",
+  color: color.muted,
+});
+
+const shareStyle = css({
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: "0.75rem",
+});

@@ -18,18 +18,32 @@ import { createRouter, type Router, type RouterContext } from "remix/router";
 import { extract_usk } from "../../lib/rs_lib.js";
 import { Layout, type PageModule } from "../client/layout.tsx";
 import * as Demo from "../client/pages/demo.tsx";
+import * as Embed from "../client/pages/embed.tsx";
 import * as Home from "../client/pages/index.tsx";
+import Post from "../client/pages/post.tsx";
 import { routes } from "../client/routes.ts";
-import { API_PATHS, createApi, isApiPath } from "./api.ts";
+import { postMeta, SITE_ORIGIN } from "../client/site.ts";
+import { API_PATHS, createApi, isApiPath, WORKER_PATHS } from "./api.ts";
 import { assets, assetsPath } from "./assets.ts";
+import { EMBED_HEADERS } from "./headers.ts";
 
-export { API_PATHS };
+export { API_PATHS, WORKER_PATHS };
 
 /** How the static build names files: `/demo` → `demo.html`, `/` → `index.html`. */
 export const fileServer: FileServerBehavior = githubPages();
 
-/** Where the static crawl starts. The library bundle is linked from no page, so it is named here. */
-export const entryPoints: readonly string[] = ["/", routes.lib.href()];
+/**
+ * Where the static crawl starts. The rest are linked from no page: the library bundle, the post
+ * page and its player (reached through links made in the browser), and the card image (named only
+ * in meta tags).
+ */
+export const entryPoints: readonly string[] = [
+  "/",
+  routes.lib.href(),
+  routes.post.href(),
+  routes.embed.href(),
+  routes.static.href({ path: "card.png" }),
+];
 
 const hydration = await assets.getScriptEntry("hydration.ts");
 const clientRuntime = { src: hydration.href, preloads: hydration.preloads };
@@ -64,6 +78,45 @@ function pageAction(page: PageModule) {
 
 pages.get(routes.home, pageAction(Home));
 pages.get(routes.demo, pageAction(Demo));
+
+// The card names the moment from `?t=`. The static build renders it without one; on Cloudflare the
+// Worker writes the same `postMeta(t)` into that file (`worker.ts`).
+pages.get(routes.post, (context) => {
+  const meta = postMeta(context.url.searchParams.get("t"));
+  return context.render(
+    <Layout
+      title={meta.title}
+      description={meta.tags.description}
+      tags={meta.tags}
+      script={clientRuntime}
+    >
+      <Post />
+    </Layout>,
+  );
+});
+
+pages.get(routes.embed, async (context) => {
+  const response = await context.render(
+    <Layout
+      title={Embed.title}
+      description={Embed.description}
+      script={clientRuntime}
+      bare
+      head={
+        <>
+          <meta name="robots" content="noindex" />
+          <link rel="canonical" href={`${SITE_ORIGIN}${routes.post.href()}`} />
+        </>
+      }
+    >
+      <Embed.default />
+    </Layout>,
+  );
+  for (const [name, value] of Object.entries(EMBED_HEADERS)) {
+    response.headers.set(name, value);
+  }
+  return response;
+});
 pages.get(
   routes.lib,
   () =>

@@ -27,6 +27,8 @@ import {
   loadAndParseConfigSettings,
 } from "@cloudflare/config";
 
+import { headersFile } from "./headers.ts";
+
 const root = decodeURIComponent(new URL("../../", import.meta.url).pathname);
 const workerPath = `${root}web/worker-dist/worker.js`;
 const wasmPath = `${root}lib/rs_lib.wasm`;
@@ -49,6 +51,10 @@ const quoted = JSON.stringify(WASM_SPECIFIER);
 if (!worker.includes(quoted)) {
   throw new Error(`${workerPath} does not import ${quoted}`);
 }
+
+// Response headers for the static files (the X player's `frame-ancestors`), in the file Workers
+// static assets read them from.
+await Deno.writeTextFile(`${root}web/dist/_headers`, headersFile());
 
 await cleanBuildOutputDir(root);
 await writeRootConfig(root, settings.data, ctx);
