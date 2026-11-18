@@ -51,13 +51,19 @@ gh attestation verify master_pk.bin -R kbn-one/time-sign \
 
 <https://time-sign.kbn.one/> has a landing page and a
 [demo](https://time-sign.kbn.one/demo) that seals a message in the browser and
-opens it once its moment has passed. A sealed message can be shared as
-`/post?t=<moment>#c=<ciphertext>` (base64url): the moment is in the query, the
-ciphertext in the fragment, which never reaches the server. On X the link shows
-a player card (`/embed?t=<moment>`) counting down to the moment; the Worker
-writes the moment into `/post`'s card meta. `/time-sign.js` is `client/mod.ts`
-bundled for the browser (the WebAssembly is inlined). The API allows any origin
-(CORS).
+opens it once its moment has passed. A sealed message is shared as one of two
+links, chosen in the demo:
+
+- private: `/post?t=<moment>#c=<ciphertext>` (base64url). The ciphertext is
+  after the `#` and never reaches any server; X shows a plain card.
+- for X: an [og.kbn.one](https://og.kbn.one/) share URL with the
+  `static/og-card.svg` template. X shows a player card (`/embed`) that counts
+  down and then opens the message in the post. og.kbn.one sees the ciphertext;
+  it sends the reader and the player here with it after `#`, so this server,
+  which holds the master key, does not.
+
+`/time-sign.js` is `client/mod.ts` bundled for the browser (the WebAssembly is
+inlined). The API allows any origin (CORS).
 
 ## Development
 

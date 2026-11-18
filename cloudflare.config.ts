@@ -17,14 +17,11 @@ export default defineConfig({
     assets: {
       htmlHandling: "auto-trailing-slash",
       notFoundHandling: "none",
-      // Only these reach the Worker — the API, and /post for its card meta;
-      // every other path is a static file. Keep in step with `WORKER_PATHS` in
-      // web/server/api.ts (checked by web/server/router.test.ts).
-      runWorkerFirst: ["/master_pk", "/at/*", "/post"],
+      // Only the API reaches the Worker; every other path is a static file.
+      // Keep in step with `API_PATHS` in web/server/api.ts (checked by its test).
+      runWorkerFirst: ["/master_pk", "/at/*"],
     },
     env: {
-      // The static build, for /post: the Worker serves it with its meta rewritten.
-      ASSETS: bindings.assets(),
       // Both are generated in CI by .github/workflows/keygen.yml
       IBKEM_PUBLIC_KEY: bindings.secret(),
       IBKEM_SECRET_KEY: bindings.secret(),

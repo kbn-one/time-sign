@@ -22,20 +22,20 @@ import * as Embed from "../client/pages/embed.tsx";
 import * as Home from "../client/pages/index.tsx";
 import Post from "../client/pages/post.tsx";
 import { routes } from "../client/routes.ts";
-import { postMeta, SITE_ORIGIN } from "../client/site.ts";
-import { API_PATHS, createApi, isApiPath, WORKER_PATHS } from "./api.ts";
+import { POST_META, SITE_ORIGIN } from "../client/site.ts";
+import { API_PATHS, createApi, isApiPath } from "./api.ts";
 import { assets, assetsPath } from "./assets.ts";
 import { EMBED_HEADERS } from "./headers.ts";
 
-export { API_PATHS, WORKER_PATHS };
+export { API_PATHS };
 
 /** How the static build names files: `/demo` → `demo.html`, `/` → `index.html`. */
 export const fileServer: FileServerBehavior = githubPages();
 
 /**
  * Where the static crawl starts. The rest are linked from no page: the library bundle, the post
- * page and its player (reached through links made in the browser), and the card image (named only
- * in meta tags).
+ * page and its player (reached through links made in the browser), the card image (named only in
+ * meta tags) and the og.kbn.one template (fetched by og.kbn.one).
  */
 export const entryPoints: readonly string[] = [
   "/",
@@ -43,6 +43,7 @@ export const entryPoints: readonly string[] = [
   routes.post.href(),
   routes.embed.href(),
   routes.static.href({ path: "card.png" }),
+  routes.static.href({ path: "og-card.svg" }),
 ];
 
 const hydration = await assets.getScriptEntry("hydration.ts");
@@ -79,10 +80,9 @@ function pageAction(page: PageModule) {
 pages.get(routes.home, pageAction(Home));
 pages.get(routes.demo, pageAction(Demo));
 
-// The card names the moment from `?t=`. The static build renders it without one; on Cloudflare the
-// Worker writes the same `postMeta(t)` into that file (`worker.ts`).
+// One page for every link: the moment and the message are read from the address in the browser.
 pages.get(routes.post, (context) => {
-  const meta = postMeta(context.url.searchParams.get("t"));
+  const meta = POST_META;
   return context.render(
     <Layout
       title={meta.title}
