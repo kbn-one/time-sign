@@ -13,7 +13,7 @@ import { clientEntry, css, type Handle, on, ref } from "remix/component";
 
 import "../share_buttons.ts";
 import { routes } from "../routes.ts";
-import { type LinkMode, shareHref } from "../site.ts";
+import { isMoment, type LinkMode, shareHref } from "../site.ts";
 import { fetchKey, formatDuration, loadClient } from "../time_sign_client.ts";
 import { color, radius } from "../tokens.ts";
 
@@ -71,6 +71,10 @@ export const TimeLockDemo = clientEntry(
      * handler, and would otherwise be sealed as the default.
      */
     let messageField: HTMLTextAreaElement | null = null;
+    /** The Open panel's text: the sealed message as `# identity` and `# ciphertext` sections. */
+    let sealedField: HTMLTextAreaElement | null = null;
+    /** Bumped to remount the Open panel's text when sealing (or forgetting) replaces it. */
+    let sealedKey = 0;
     let momentField: HTMLInputElement | null = null;
     let sealed: Sealed | null = null;
     /** Where the share link puts the ciphertext — see `LINK_MODES`. */
@@ -118,6 +122,7 @@ export const TimeLockDemo = clientEntry(
         const id = timeId(at);
         const enc = await encrypt(mpk, id, new TextEncoder().encode(message));
         sealed = { id, ciphertext: enc.toBase64() };
+        sealedKey++;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(sealed));
         outcome = { kind: "none" };
       } catch (error) {
@@ -127,7 +132,15 @@ export const TimeLockDemo = clientEntry(
     }
 
     async function open() {
-      if (!sealed) return;
+      // What the panel holds now, which may be a message pasted from elsewhere.
+      const parsed = parseSealedText(sealedField?.value ?? "");
+      if ("error" in parsed) {
+        outcome = { kind: "error", text: parsed.error };
+        handle.update();
+        return;
+      }
+      sealed = parsed;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sealed));
       outcome = { kind: "busy", text: "Asking the server for the key…" };
       handle.update();
       try {
@@ -151,6 +164,7 @@ export const TimeLockDemo = clientEntry(
 
     function forget() {
       sealed = null;
+      sealedKey++;
       outcome = { kind: "none" };
       localStorage.removeItem(STORAGE_KEY);
       handle.update();
@@ -226,43 +240,49 @@ export const TimeLockDemo = clientEntry(
           </button>
         </section>
 
-        <section mix={cardStyle} aria-label="Open">
-          <h2 mix={stepStyle}>2. Open</h2>
-          {sealed
-            ? (
-              <>
-                <p>
-                  Sealed for <strong>{formatLocal(sealed.id)}</strong> (identity
-                  {" "}
-                  <code>{sealed.id}</code>).
-                </p>
-                <label mix={fieldStyle}>
-                  Ciphertext (base64)
-                  <textarea
-                    rows={4}
-                    readOnly
-                    value={sealed.ciphertext}
-                    mix={inputStyle}
-                  />
-                </label>
-                <div mix={rowStyle}>
-                  <button
-                    type="button"
-                    disabled={outcome.kind === "busy"}
-                    mix={[buttonStyle, on("click", open)]}
-                  >
-                    Open
-                  </button>
-                  <button
-                    type="button"
-                    mix={[ghostButtonStyle, on("click", forget)]}
-                  >
-                    Forget
-                  </button>
-                </div>
-              </>
-            )
-            : <p mix={mutedStyle}>Nothing sealed yet.</p>}
+        <section mix={cardStyle} aria-label="Check">
+          <h2 mix={stepStyle}>2. Check</h2>
+          {sealed && (
+            <p>
+              Sealed for <strong>{formatLocal(sealed.id)}</strong>.
+            </p>
+          )}
+          <label mix={fieldStyle}>
+            Sealed message — this one, or paste another
+            <textarea
+              key={sealedKey}
+              rows={9}
+              spellcheck={false}
+              placeholder={sealedText({
+                id: "2030-01-01T00:00:00Z",
+                ciphertext: "…",
+              })}
+              defaultValue={sealed ? sealedText(sealed) : ""}
+              mix={[
+                inputStyle,
+                ref((node) => {
+                  sealedField = node as HTMLTextAreaElement;
+                }),
+              ]}
+            />
+          </label>
+          <div mix={rowStyle}>
+            <button
+              type="button"
+              disabled={outcome.kind === "busy"}
+              mix={[buttonStyle, on("click", open)]}
+            >
+              Open
+            </button>
+            {sealed && (
+              <button
+                type="button"
+                mix={[ghostButtonStyle, on("click", forget)]}
+              >
+                Forget
+              </button>
+            )}
+          </div>
           {/* Right under the buttons, so the answer to "Open" is where the click was. */}
           <Status outcome={outcome} sealed={sealed} now={now} />
         </section>
@@ -354,6 +374,42 @@ function postLink(sealed: Sealed, mode: LinkMode): string {
     Uint8Array.fromBase64(sealed.ciphertext),
     mode,
   );
+}
+
+/** A sealed message as the Open panel shows it. */
+function sealedText(sealed: Sealed): string {
+  return `# identity\n${sealed.id}\n\n# ciphertext\n${sealed.ciphertext}\n`;
+}
+
+/**
+ * The Open panel's text back into a sealed message: a `# identity` section holding the moment, a
+ * `# ciphertext` section holding base64 or base64url (line breaks and spaces ignored).
+ */
+function parseSealedText(text: string): Sealed | { error: string } {
+  const sections: Record<string, string> = {};
+  let current = "";
+  for (const line of text.split(/\r?\n/)) {
+    const header = line.match(/^#\s*(\w+)/);
+    if (header) current = header[1].toLowerCase();
+    else if (current) sections[current] = (sections[current] ?? "") + line;
+  }
+  const id = sections.identity?.trim() ?? "";
+  if (!isMoment(id)) {
+    return {
+      error:
+        "The # identity section needs a moment like 2030-01-01T00:00:00Z (seconds ending in 0).",
+    };
+  }
+  const raw = (sections.ciphertext ?? "").replace(/\s+/g, "");
+  if (!raw) return { error: "The # ciphertext section is empty." };
+  try {
+    const bytes = Uint8Array.fromBase64(
+      raw.replaceAll("-", "+").replaceAll("_", "/"),
+    );
+    return { id, ciphertext: bytes.toBase64() };
+  } catch {
+    return { error: "The # ciphertext section is not base64." };
+  }
 }
 
 function readSealed(): Sealed | null {
