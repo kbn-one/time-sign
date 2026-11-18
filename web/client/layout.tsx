@@ -8,8 +8,9 @@
 
 import { css, type Handle, type RemixNode } from "remix/component";
 
-import { routes } from "./routes.ts";
-import type { PageMeta } from "./site.ts";
+import { type Lang, LANGS, messages } from "./i18n.ts";
+import { pagesFor, routes } from "./routes.ts";
+import { type PageMeta, SITE_ORIGIN } from "./site.ts";
 import { color } from "./tokens.ts";
 
 /** Where the client runtime lives, and the chunks it imports. */
@@ -19,6 +20,9 @@ export interface ClientRuntime {
 }
 
 export interface LayoutProps {
+  lang: Lang;
+  /** This page in every language, by path — for the language switch and `hreflang`. */
+  alternates: Record<Lang, string>;
   title: string;
   description: string;
   /** The client runtime for a page that places an island; `null` for one that does not. */
@@ -32,11 +36,11 @@ export interface LayoutProps {
   children: RemixNode;
 }
 
-/** What a page module exports: its component and what the shell needs to frame it. */
+/** What a page module exports: its component and what the shell needs to frame it, per language. */
 export interface PageModule {
-  default: (handle: Handle) => () => RemixNode;
-  title: string;
-  description: string;
+  default: (handle: Handle<{ lang: Lang }>) => () => RemixNode;
+  title: Record<Lang, string>;
+  description: Record<Lang, string>;
   /** Whether the page places an island, so the shell boots the runtime for it. */
   hydrate: boolean;
 }
@@ -45,10 +49,22 @@ export const REPOSITORY_URL = "https://github.com/kbn-one/time-sign";
 
 export function Layout(handle: Handle<LayoutProps>) {
   return () => {
-    const { title, description, script, tags, head, bare, children } =
-      handle.props;
+    const {
+      lang,
+      alternates,
+      title,
+      description,
+      script,
+      tags,
+      head,
+      bare,
+      children,
+    } = handle.props;
+    const m = messages[lang].nav;
+    const pages = pagesFor(lang);
+    const other: Lang = lang === "ja" ? "en" : "ja";
     return (
-      <html lang="en">
+      <html lang={lang}>
         <head>
           <meta charset="utf-8" />
           <meta
@@ -63,6 +79,14 @@ export function Layout(handle: Handle<LayoutProps>) {
                 : <meta key={key} name={key} content={content} />
             )
             : <meta name="description" content={description} />}
+          {LANGS.map((l) => (
+            <link
+              key={l}
+              rel="alternate"
+              hreflang={l}
+              href={`${SITE_ORIGIN}${alternates[l]}`}
+            />
+          ))}
           {head}
           <link
             rel="stylesheet"
@@ -78,16 +102,18 @@ export function Layout(handle: Handle<LayoutProps>) {
             <>
               <header mix={headerStyle}>
                 <nav mix={navStyle}>
-                  <a href={routes.home.href()} mix={brandStyle}>time-sign</a>
-                  <a href={routes.demo.href()}>Demo</a>
+                  <a href={pages.home.href()} mix={brandStyle}>time-sign</a>
+                  <a href={pages.demo.href()}>{m.demo}</a>
                   <a href={REPOSITORY_URL}>GitHub</a>
+                  <a href={alternates[other]} hreflang={other} lang={other}>
+                    {m.otherLanguage}
+                  </a>
                 </nav>
               </header>
               <main mix={mainStyle}>{children}</main>
               <footer mix={footerStyle}>
                 <p>
-                  Source and key provenance:{" "}
-                  <a href={REPOSITORY_URL}>kbn-one/time-sign</a>
+                  {m.footer} <a href={REPOSITORY_URL}>kbn-one/time-sign</a>
                 </p>
               </footer>
             </>

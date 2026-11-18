@@ -21,15 +21,16 @@ import * as Demo from "../client/pages/demo.tsx";
 import * as Embed from "../client/pages/embed.tsx";
 import * as Home from "../client/pages/index.tsx";
 import Post from "../client/pages/post.tsx";
-import { routes } from "../client/routes.ts";
-import { POST_META, SITE_ORIGIN } from "../client/site.ts";
+import { type Lang, LANGS } from "../client/i18n.ts";
+import { type PageName, pagesFor, routes } from "../client/routes.ts";
+import { postMeta, SITE_ORIGIN } from "../client/site.ts";
 import { API_PATHS, createApi, isApiPath } from "./api.ts";
 import { assets, assetsPath } from "./assets.ts";
 import { EMBED_HEADERS } from "./headers.ts";
 
 export { API_PATHS };
 
-/** How the static build names files: `/demo` → `demo.html`, `/` → `index.html`. */
+/** How the static build names files: `/demo` → `demo.html`, `/` → `index.html`, `/en` → `en.html`. */
 export const fileServer: FileServerBehavior = githubPages();
 
 /**
@@ -38,12 +39,14 @@ export const fileServer: FileServerBehavior = githubPages();
  * meta tags) and the og.kbn.one template (fetched by og.kbn.one).
  */
 export const entryPoints: readonly string[] = [
-  "/",
+  ...LANGS.flatMap((lang) => {
+    const page = pagesFor(lang);
+    return [page.home.href(), page.post.href(), page.embed.href()];
+  }),
   routes.lib.href(),
-  routes.post.href(),
-  routes.embed.href(),
   routes.static.href({ path: "card.png" }),
   routes.static.href({ path: "og-card.svg" }),
+  routes.static.href({ path: "og-card-en.svg" }),
 ];
 
 const hydration = await assets.getScriptEntry("hydration.ts");
@@ -63,60 +66,75 @@ const pages = createRouter({ middleware: [render({ assets })] });
 
 type PageContext = RouterContext<typeof pages>;
 
-function pageAction(page: PageModule) {
+/** A page's path in every language, for the language switch and `hreflang`. */
+function alternates(name: PageName): Record<Lang, string> {
+  return { ja: pagesFor("ja")[name].href(), en: pagesFor("en")[name].href() };
+}
+
+function pageAction(page: PageModule, lang: Lang, name: PageName) {
   const Page = page.default;
   return (context: PageContext): Response =>
     context.render(
       <Layout
-        title={page.title}
-        description={page.description}
+        lang={lang}
+        alternates={alternates(name)}
+        title={page.title[lang]}
+        description={page.description[lang]}
         script={page.hydrate ? clientRuntime : null}
       >
-        <Page />
+        <Page lang={lang} />
       </Layout>,
     );
 }
 
-pages.get(routes.home, pageAction(Home));
-pages.get(routes.demo, pageAction(Demo));
+for (const lang of LANGS) {
+  const page = pagesFor(lang);
+  pages.get(page.home, pageAction(Home, lang, "home"));
+  pages.get(page.demo, pageAction(Demo, lang, "demo"));
 
-// One page for every link: the moment and the message are read from the address in the browser.
-pages.get(routes.post, (context) => {
-  const meta = POST_META;
-  return context.render(
-    <Layout
-      title={meta.title}
-      description={meta.tags.description}
-      tags={meta.tags}
-      script={clientRuntime}
-    >
-      <Post />
-    </Layout>,
-  );
-});
+  // One page for every link: the moment and the message are read from the address in the browser.
+  pages.get(page.post, (context) => {
+    const meta = postMeta(lang);
+    return context.render(
+      <Layout
+        lang={lang}
+        alternates={alternates("post")}
+        title={meta.title}
+        description={meta.tags.description}
+        tags={meta.tags}
+        script={clientRuntime}
+      >
+        <Post lang={lang} />
+      </Layout>,
+    );
+  });
 
-pages.get(routes.embed, async (context) => {
-  const response = await context.render(
-    <Layout
-      title={Embed.title}
-      description={Embed.description}
-      script={clientRuntime}
-      bare
-      head={
-        <>
-          <meta name="robots" content="noindex" />
-          <link rel="canonical" href={`${SITE_ORIGIN}${routes.post.href()}`} />
-        </>
-      }
-    >
-      <Embed.default />
-    </Layout>,
-  );
-  for (const [name, value] of Object.entries(EMBED_HEADERS)) {
-    response.headers.set(name, value);
-  }
-  return response;
-});
+  pages.get(page.embed, async (context) => {
+    const response = await context.render(
+      <Layout
+        lang={lang}
+        alternates={alternates("embed")}
+        title={Embed.title[lang]}
+        description={Embed.description[lang]}
+        script={clientRuntime}
+        bare
+        head={
+          <>
+            <meta name="robots" content="noindex" />
+            <link rel="canonical" href={`${SITE_ORIGIN}${page.post.href()}`} />
+          </>
+        }
+      >
+        <Embed.default lang={lang} />
+      </Layout>,
+    );
+    for (const [name, value] of Object.entries(EMBED_HEADERS)) {
+      response.headers.set(name, value);
+    }
+    return response;
+  });
+}
+
 pages.get(
   routes.lib,
   () =>

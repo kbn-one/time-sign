@@ -33,14 +33,3 @@ export async function fetchKey(moment: string): Promise<KeyAnswer> {
   }
   return { kind: "key", usk: new Uint8Array(await response.arrayBuffer()) };
 }
-
-/** `1 h 2 min`, `3 min 4 s`, `5 s`, `6 days`. */
-export function formatDuration(ms: number): string {
-  const s = Math.ceil(ms / 1000);
-  if (s < 60) return `${s} s`;
-  if (s < 3600) return `${Math.floor(s / 60)} min ${s % 60} s`;
-  const h = Math.floor(s / 3600);
-  return h < 48
-    ? `${h} h ${Math.floor((s % 3600) / 60)} min`
-    : `${Math.floor(h / 24)} days`;
-}

@@ -49,7 +49,8 @@ gh attestation verify master_pk.bin -R kbn-one/time-sign \
 
 ## Site
 
-<https://time-sign.kbn.one/> has a landing page and a
+<https://time-sign.kbn.one/> (Japanese; English at
+<https://time-sign.kbn.one/en>) has a landing page and a
 [demo](https://time-sign.kbn.one/demo) that seals a message in the browser and
 opens it once its moment has passed. A sealed message is shared as one of two
 links, chosen in the demo:
@@ -62,8 +63,10 @@ links, chosen in the demo:
   it sends the reader and the player here with it after `#`, so this server,
   which holds the master key, does not.
 
-`/time-sign.js` is `client/mod.ts` bundled for the browser (the WebAssembly is
-inlined). The API allows any origin (CORS).
+Moments are shown in the reader's own time zone with its abbreviation
+(`2026/11/18 14:00:00 JST`). An X card is written once for everyone, so it says
+the moment in the sharer's time zone. `/time-sign.js` is `client/mod.ts` bundled
+for the browser (the WebAssembly is inlined). The API allows any origin (CORS).
 
 ## Development
 

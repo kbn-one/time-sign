@@ -6,12 +6,19 @@
  * moment comes it asks `/at/<moment>` for the key and opens the message in the page.
  */
 
-import { clientEntry, css, type Handle, on } from "remix/component";
+import {
+  clientEntry,
+  css,
+  type Handle,
+  on,
+  type SerializableValue,
+} from "remix/component";
 
 import "../share_buttons.ts";
-import { routes } from "../routes.ts";
+import { formatDuration, formatMoment, type Lang, messages } from "../i18n.ts";
+import { pagesFor } from "../routes.ts";
 import { parsePost } from "../site.ts";
-import { fetchKey, formatDuration, loadClient } from "../time_sign_client.ts";
+import { fetchKey, loadClient } from "../time_sign_client.ts";
 import { color, radius } from "../tokens.ts";
 
 type State =
@@ -22,9 +29,14 @@ type State =
   | { kind: "opened"; text: string }
   | { kind: "error"; text: string };
 
+export interface SealedMessageProps {
+  lang: Lang;
+  [key: string]: SerializableValue;
+}
+
 export const SealedMessage = clientEntry(
   import.meta.url,
-  function SealedMessage(handle: Handle) {
+  function SealedMessage(handle: Handle<SealedMessageProps>) {
     let state: State = { kind: "loading" };
     let moment = "";
     let ciphertext: Uint8Array = new Uint8Array();
@@ -56,7 +68,10 @@ export const SealedMessage = clientEntry(
     handle.queueTask(() => {
       const parsed = parsePost(location.search, location.hash);
       if ("error" in parsed) {
-        state = { kind: "invalid", text: parsed.error };
+        state = {
+          kind: "invalid",
+          text: messages[handle.props.lang].post.linkErrors[parsed.error],
+        };
         handle.update();
         return;
       }
@@ -83,45 +98,50 @@ export const SealedMessage = clientEntry(
     return () => (
       <div mix={rootStyle}>
         <section mix={cardStyle} aria-live="polite">
-          {body(state, moment, now, open)}
+          {body(state, moment, now, open, handle.props.lang)}
         </section>
         <div mix={footStyle}>
           <share-buttons />
-          <a href={routes.demo.href()}>Seal a message of your own</a>
+          <a href={pagesFor(handle.props.lang).demo.href()}>
+            {messages[handle.props.lang].post.ownLink}
+          </a>
         </div>
       </div>
     );
   },
 );
 
-function body(state: State, moment: string, now: number, open: () => void) {
-  const when = moment ? new Date(moment).toLocaleString() : "";
+function body(
+  state: State,
+  moment: string,
+  now: number,
+  open: () => void,
+  lang: Lang,
+) {
+  const m = messages[lang].post;
+  const when = moment ? formatMoment(moment, lang) : "";
   switch (state.kind) {
     case "loading":
-      return <p mix={mutedStyle}>Reading the link…</p>;
+      return <p mix={mutedStyle}>{m.reading}</p>;
     case "invalid":
       return <p role="alert" mix={errorStyle}>{state.text}</p>;
     case "locked": {
       const left = Date.parse(moment) - now;
       return (
         <>
-          <p mix={bigStyle}>🔒 Sealed until {when}</p>
+          <p mix={bigStyle}>{m.sealedUntil(when)}</p>
           <p mix={mutedStyle}>
-            {left > 0
-              ? `Opens in ${
-                formatDuration(left)
-              }. Keep this page open, or come back later.`
-              : "Opening…"}
+            {left > 0 ? m.opensIn(formatDuration(left, lang)) : m.opening}
           </p>
         </>
       );
     }
     case "opening":
-      return <p mix={mutedStyle}>Asking the server for the key…</p>;
+      return <p mix={mutedStyle}>{m.asking}</p>;
     case "opened":
       return (
         <>
-          <p mix={bigStyle}>🔓 Opened — sealed until {when}</p>
+          <p mix={bigStyle}>{m.opened(when)}</p>
           <blockquote mix={messageStyle}>{state.text}</blockquote>
         </>
       );
@@ -130,7 +150,7 @@ function body(state: State, moment: string, now: number, open: () => void) {
         <>
           <p role="alert" mix={errorStyle}>{state.text}</p>
           <button type="button" mix={[buttonStyle, on("click", open)]}>
-            Try again
+            {m.tryAgain}
           </button>
         </>
       );
