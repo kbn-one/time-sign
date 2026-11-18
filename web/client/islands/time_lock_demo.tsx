@@ -260,45 +260,53 @@ export const TimeLockDemo = clientEntry(
                     Forget
                   </button>
                 </div>
-                <fieldset mix={modeStyle}>
-                  <legend>Share link</legend>
-                  {LINK_MODES.map(([value, label, explanation]) => (
-                    <label key={value} mix={modeOptionStyle}>
-                      <input
-                        type="radio"
-                        name="link-mode"
-                        value={value}
-                        defaultChecked={mode === value}
-                        mix={on("change", () => {
-                          mode = value;
-                          handle.update();
-                        })}
-                      />
-                      <span>
-                        <strong>{label}</strong>
-                        <br />
-                        <span mix={mutedStyle}>{explanation}</span>
-                      </span>
-                    </label>
-                  ))}
-                </fieldset>
-                <p mix={postLinkStyle}>
-                  <a href={postLink(sealed, mode)} target="_blank">
-                    {postLink(sealed, mode)}
-                  </a>
-                </p>
               </>
             )
             : <p mix={mutedStyle}>Nothing sealed yet.</p>}
+          {/* Right under the buttons, so the answer to "Open" is where the click was. */}
           <Status outcome={outcome} sealed={sealed} now={now} />
         </section>
 
-        <section mix={shareStyle} aria-label="Share">
-          <span mix={mutedStyle}>
-            {sealed ? "Share the sealed message:" : "Share this demo:"}
-          </span>
-          {/* Empty `url` shares this page; with a sealed message, its post link. */}
-          <share-buttons url={sealed ? postLink(sealed, mode) : ""} />
+        <section mix={cardStyle} aria-label="Share">
+          <h2 mix={stepStyle}>3. Share</h2>
+          {sealed && (
+            <>
+              <fieldset mix={modeStyle}>
+                <legend>Share link</legend>
+                {LINK_MODES.map(([value, label, explanation]) => (
+                  <label key={value} mix={modeOptionStyle}>
+                    <input
+                      type="radio"
+                      name="link-mode"
+                      value={value}
+                      defaultChecked={mode === value}
+                      mix={on("change", () => {
+                        mode = value;
+                        handle.update();
+                      })}
+                    />
+                    <span>
+                      <strong>{label}</strong>
+                      <br />
+                      <span mix={mutedStyle}>{explanation}</span>
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+              <p mix={postLinkStyle}>
+                <a href={postLink(sealed, mode)} target="_blank">
+                  {postLink(sealed, mode)}
+                </a>
+              </p>
+            </>
+          )}
+          <div mix={shareStyle}>
+            <span mix={mutedStyle}>
+              {sealed ? "Share the sealed message:" : "Share this demo:"}
+            </span>
+            {/* Empty `url` shares this page; with a sealed message, its link. */}
+            <share-buttons url={sealed ? postLink(sealed, mode) : ""} />
+          </div>
         </section>
       </div>
     );
