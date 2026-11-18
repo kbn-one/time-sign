@@ -5,8 +5,8 @@
  * (`/time-sign.js`, imported on first use). Opening fetches `/at/<moment>`: before the moment the
  * server answers "It is not the time", after it the user secret key, which decrypts the message.
  *
- * The moment is the identity, so it is fixed to one spelling — `Date#toISOString()` — when sealing,
- * and opening asks for exactly that string. The sealed message is kept in `localStorage`.
+ * The moment is the identity, so it is fixed to the one spelling the server issues keys for —
+ * `timeId()`, rounded up to 10 seconds — when sealing, and opening asks for exactly that string. The sealed message is kept in `localStorage`.
  */
 
 import {
@@ -30,6 +30,7 @@ export interface TimeLockDemoProps {
 interface TimeSignClient {
   encrypt(mpk: Uint8Array, id: string, plain: Uint8Array): Promise<Uint8Array>;
   decrypt(usk: Uint8Array, enc: Uint8Array): Promise<ArrayBuffer>;
+  timeId(at: Date | number | string): string;
 }
 
 interface Sealed {
@@ -101,11 +102,11 @@ export const TimeLockDemo = clientEntry(
       outcome = { kind: "busy", text: "Sealing…" };
       handle.update();
       try {
-        const { encrypt } = await loadClient();
+        const { encrypt, timeId } = await loadClient();
         const response = await fetch(routes.masterPk.href());
         if (!response.ok) throw new Error(`master_pk: ${response.status}`);
         const mpk = new Uint8Array(await response.arrayBuffer());
-        const id = at.toISOString();
+        const id = timeId(at);
         const enc = await encrypt(mpk, id, new TextEncoder().encode(message));
         sealed = { id, ciphertext: enc.toBase64() };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(sealed));
@@ -172,7 +173,7 @@ export const TimeLockDemo = clientEntry(
             <input
               key={momentKey}
               type="datetime-local"
-              step="1"
+              step="10"
               defaultValue={moment}
               mix={[
                 inputStyle,

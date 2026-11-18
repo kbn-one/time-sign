@@ -2,6 +2,8 @@ import { decaps, encaps } from "../lib/rs_lib.js";
 import { decodeBase64 } from "@std/encoding/base64";
 import * as msgpack from "@std/msgpack";
 
+export { TIME_STEP_MS, timeId } from "./time_id.ts";
+
 export function missingFeature() {
   if (typeof Deno != "undefined") return null;
   if (typeof crypto == "undefined") return "crypto";

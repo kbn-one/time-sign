@@ -8,22 +8,28 @@ the decryption key for a date only after that date has passed.
 import {
   decrypt,
   encrypt,
+  timeId,
 } from "https://raw.githubusercontent.com/kbn-one/time-sign/main/client/mod.ts";
 
 const server = "https://time-sign.kbn.one";
-const time = "2023-04-01";
+// Keys are issued every 10 seconds, for one spelling of a moment (UTC, rounded
+// up): encrypt for that. timeId("2030-01-01") === "2030-01-01T00:00:00Z"
+const id = timeId("2030-01-01");
 
 const mpk = new Uint8Array(
   await (await fetch(server + "/master_pk")).arrayBuffer(),
 );
-const enc = await encrypt(mpk, time, new TextEncoder().encode("秘密"));
+const enc = await encrypt(mpk, id, new TextEncoder().encode("秘密"));
 
-// after `time` has passed
+// after the moment has passed
 const usk = new Uint8Array(
-  await (await fetch(server + `/at/${time}`)).arrayBuffer(),
+  await (await fetch(server + `/at/${id}`)).arrayBuffer(),
 );
 console.log(new TextDecoder().decode(await decrypt(usk, enc)));
 ```
+
+`GET /at/<date>` with any other spelling of a date is a `301` to
+`/at/<timeId(date)>`; before the moment it answers `It is not the time`.
 
 ## Master key
 

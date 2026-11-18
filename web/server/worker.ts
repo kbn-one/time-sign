@@ -26,9 +26,30 @@ exports.__wbindgen_start();
 // an isolate serves, so the router is built once from them.
 let router: ReturnType<typeof createApi> | undefined;
 
+/** The parts of the Workers runtime used here that Deno's types do not describe. */
+interface ExecutionContext {
+  waitUntil(promise: Promise<unknown>): void;
+}
+const edgeCache = (caches as unknown as { default: Cache }).default;
+
 export default {
-  fetch(request: Request, env: Bindings): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Bindings,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
     router ??= createApi(glue.extract_usk, env);
-    return router.fetch(request);
+    if (request.method !== "GET") return router.fetch(request);
+
+    // Cloudflare does not cache what a Worker answers on its own, so the API keeps its public
+    // answers (`cache-control: public, …`: redirects to a moment, keys for past moments, refusals
+    // until the moment comes) in this data center's cache, and a key is extracted once per moment.
+    const cached = await edgeCache.match(request);
+    if (cached) return cached;
+    const response = await router.fetch(request);
+    if (response.headers.get("cache-control")?.startsWith("public")) {
+      ctx.waitUntil(edgeCache.put(request, response.clone()));
+    }
+    return response;
   },
 };
