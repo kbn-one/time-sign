@@ -9,7 +9,7 @@
  * `timeId()`, rounded up to 10 seconds — when sealing, and opening asks for exactly that string. The sealed message is kept in `localStorage`.
  */
 
-import { clientEntry, css, type Handle, on } from "remix/component";
+import { clientEntry, css, type Handle, on, ref } from "remix/component";
 
 import "../share_buttons.ts";
 import { routes } from "../routes.ts";
@@ -65,6 +65,13 @@ export const TimeLockDemo = clientEntry(
     let moment = "";
     /** Bumped to remount the date input when a preset replaces its value. */
     let momentKey = 0;
+    /**
+     * The fields themselves. Sealing reads what they hold rather than what the `input` handlers
+     * last saw: text typed before the page finished hydrating is in the field but never reached a
+     * handler, and would otherwise be sealed as the default.
+     */
+    let messageField: HTMLTextAreaElement | null = null;
+    let momentField: HTMLInputElement | null = null;
     let sealed: Sealed | null = null;
     /** Where the share link puts the ciphertext — see `LINK_MODES`. */
     let mode: LinkMode = "private";
@@ -93,6 +100,8 @@ export const TimeLockDemo = clientEntry(
     });
 
     async function seal() {
+      if (messageField) message = messageField.value;
+      if (momentField) moment = momentField.value;
       const at = new Date(moment);
       if (isNaN(at.getTime())) {
         outcome = { kind: "error", text: "Pick a valid date and time." };
@@ -158,6 +167,9 @@ export const TimeLockDemo = clientEntry(
               defaultValue={message}
               mix={[
                 inputStyle,
+                ref((node) => {
+                  messageField = node as HTMLTextAreaElement;
+                }),
                 on("input", (event) => {
                   message = event.currentTarget.value;
                 }),
@@ -173,6 +185,9 @@ export const TimeLockDemo = clientEntry(
               defaultValue={moment}
               mix={[
                 inputStyle,
+                ref((node) => {
+                  momentField = node as HTMLInputElement;
+                }),
                 on("input", (event) => {
                   moment = event.currentTarget.value;
                 }),
