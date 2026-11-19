@@ -65,7 +65,7 @@ links, chosen in the demo:
 
 Moments are shown in the reader's own time zone with its abbreviation
 (`2026/11/18 14:00:00 JST`). An X card is written once for everyone, so it says
-the moment in the sharer's time zone. `/client.js` is `client/mod.ts` bundled
+the moment in the sharer's time zone. `/time-sign.js` is `client/mod.ts` bundled
 for the browser (the WebAssembly is inlined). The API allows any origin (CORS).
 
 ## Development
@@ -81,7 +81,7 @@ Deno + Remix v3 (`remix/router`, `remix/component`), laid out after
 
 ```sh
 deno task wasmbuild          # rebuild lib/ from rs_lib/
-deno task build:lib          # rebuild client/mod.js (served as /client.js)
+deno task build:lib          # rebuild client/mod.js (served as /time-sign.js)
 deno task check              # type check, lint, format
 deno task test
 deno task genkey ./tmp-key   # local key pair (tmp-key/secrets.json)

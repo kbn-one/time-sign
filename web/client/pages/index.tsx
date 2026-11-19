@@ -18,7 +18,7 @@ export const description: Record<Lang, string> = {
 export const hydrate = false;
 
 const example =
-  `import { decrypt, encrypt, timeId } from "https://time-sign.kbn.one/client.js";
+  `import { decrypt, encrypt, timeId } from "https://time-sign.kbn.one/time-sign.js";
 
 const server = "https://time-sign.kbn.one";
 const id = timeId("2030-01-01"); // "2030-01-01T00:00:00Z"
