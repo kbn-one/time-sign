@@ -5,7 +5,8 @@
  * resolve nothing, so every URL here is absolute.
  */
 
-import { routes } from "./routes.ts";
+import { formatMoment, type Lang, type LinkError } from "./i18n.ts";
+import { pagesFor, routes } from "./routes.ts";
 
 export const SITE_ORIGIN = "https://time-sign.kbn.one";
 
@@ -30,67 +31,80 @@ export interface PageMeta {
 }
 
 /**
- * The meta of `/post` itself: a plain card, the same for every link.
+ * The meta of a language's `/post`: a plain card, the same for every link.
  *
  * A private link (`/post?t=…#c=…`) is shared as it is, and nothing that reads it — a crawler, this
  * server — sees past the `#`, so its card cannot say more. An X-card link goes through og.kbn.one
  * instead ({@link shareHref}), whose card names the moment.
  */
-export const POST_META: PageMeta = {
-  title: "A sealed message — time-sign",
-  tags: {
-    description:
+export function postMeta(lang: Lang): PageMeta {
+  const [title, description] = lang === "ja"
+    ? [
+      "封印されたメッセージ — time-sign",
+      "時限暗号で封印されています。その時が来るまで、送った本人も含めて誰も読めません。",
+    ]
+    : [
+      "A sealed message — time-sign",
       "Encrypted with time-lock encryption: nobody can read it before its moment, not even the sender.",
-    "og:type": "website",
-    "og:site_name": "time-sign",
-    "og:title": "A sealed message — time-sign",
-    "og:description":
-      "Encrypted with time-lock encryption: nobody can read it before its moment, not even the sender.",
-    "og:image": CARD_IMAGE,
-    "twitter:card": "summary",
-    "twitter:title": "A sealed message — time-sign",
-    "twitter:image": CARD_IMAGE,
-  },
-};
-
-/** og.kbn.one's share endpoint, and this site's template for it (`static/og-card.svg`). */
-export const OG_SHARE = "https://og.kbn.one/share";
-export const CARD_TEMPLATE = `${new URL(SITE_ORIGIN).host}${
-  routes.static.href({ path: "og-card.svg" })
-}`;
-
-/** `2030-01-01 00:00:00 UTC` */
-export function formatUtc(moment: string): string {
-  return moment.replace("T", " ").replace("Z", " UTC");
+    ];
+  return {
+    title,
+    tags: {
+      description,
+      "og:type": "website",
+      "og:site_name": "time-sign",
+      "og:title": title,
+      "og:description": description,
+      "og:image": CARD_IMAGE,
+      "twitter:card": "summary",
+      "twitter:title": title,
+      "twitter:image": CARD_IMAGE,
+    },
+  };
 }
+
+/** og.kbn.one's share endpoint, and this site's template for it per language (`static/og-card*.svg`). */
+export const OG_SHARE = "https://og.kbn.one/share";
+export const CARD_TEMPLATES: Record<Lang, string> = {
+  ja: `${new URL(SITE_ORIGIN).host}${
+    routes.static.href({ path: "og-card.svg" })
+  }`,
+  en: `${new URL(SITE_ORIGIN).host}${
+    routes.static.href({ path: "og-card-en.svg" })
+  }`,
+};
 
 /** Which kind of link to share a sealed message as. */
 export type LinkMode = "card" | "private";
 
 /**
- * The link to share a sealed message by.
+ * The link to share a sealed message by, for readers of `lang`.
  *
- * - `private`: `/post?t=<moment>#c=<ciphertext>` on `origin`. The ciphertext is after the `#` and
+ * - `private`: the language's `/post?t=<moment>#c=<ciphertext>` on `origin`. The ciphertext is after the `#` and
  *   never leaves the reader's browser; X shows a plain card.
- * - `card`: og.kbn.one's share URL for `static/og-card.svg`, with the ciphertext in its query —
+ * - `card`: og.kbn.one's share URL for the language's template (`static/og-card.svg`,
+ *   `static/og-card-en.svg`), with the ciphertext in its query —
  *   og.kbn.one needs it to write X's player card. The template sends both the reader and the
  *   player to this site with the ciphertext after `#` (`/post?t=…#c=…`, `/embed?t=…#c=…`), so it
- *   still never reaches this server, which holds the master key.
+ *   still never reaches this server, which holds the master key. The card's `when` is the moment
+ *   as the sharer reads it: this runs in their browser, so it is their time zone, abbreviated.
  */
 export function shareHref(
   origin: string,
   moment: string,
   ciphertext: Uint8Array,
   mode: LinkMode = "private",
+  lang: Lang = "ja",
+  timeZone?: string,
 ): string {
   const c = ciphertext.toBase64({ alphabet: "base64url", omitPadding: true });
   if (mode === "private") {
-    return `${origin}${routes.post.href()}?t=${moment}#c=${c}`;
+    return `${origin}${pagesFor(lang).post.href()}?t=${moment}#c=${c}`;
   }
   const query = new URLSearchParams({
-    tmpl: CARD_TEMPLATE,
+    tmpl: CARD_TEMPLATES[lang],
     t: moment,
-    when: formatUtc(moment),
+    when: formatMoment(moment, lang, timeZone),
     c,
   });
   return `${OG_SHARE}?${query}`;
@@ -100,19 +114,19 @@ export function shareHref(
 export function parsePost(
   search: string,
   hash: string,
-): { moment: string; ciphertext: Uint8Array } | { error: string } {
+): { moment: string; ciphertext: Uint8Array } | { error: LinkError } {
   const query = new URLSearchParams(search);
   const moment = query.get("t");
-  if (!isMoment(moment)) return { error: "This link has no valid moment." };
+  if (!isMoment(moment)) return { error: "noMoment" };
   const c = query.get("c") ??
     new URLSearchParams(hash.replace(/^#/, "")).get("c");
-  if (!c) return { error: "This link has no message in it." };
+  if (!c) return { error: "noMessage" };
   try {
     return {
       moment,
       ciphertext: Uint8Array.fromBase64(c, { alphabet: "base64url" }),
     };
   } catch {
-    return { error: "The message in this link is damaged." };
+    return { error: "damaged" };
   }
 }

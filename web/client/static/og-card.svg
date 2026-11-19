@@ -3,12 +3,12 @@
   <metadata id="og">
     <![CDATA[
   {
-    "vars": { "when": "its moment" },
+    "vars": { "when": "その時" },
     "fonts": ["Noto Sans JP:700"],
     "url": "https://time-sign.kbn.one/post?t={{t}}#c={{c}}",
     "og": {
-      "title": "A message sealed until {{when}}",
-      "description": "Time-lock encrypted with time-sign: nobody can read it before {{when}}, not even the sender. Then it opens right here.",
+      "title": "{{when}} まで封印されたメッセージ",
+      "description": "time-sign の時限暗号で封印されています。{{when}} より前には、送った本人も含めて誰も読めません。その時が来たら、ここで開封されます。",
       "site_name": "time-sign"
     },
     "player": {
@@ -26,10 +26,10 @@
   <rect x="300" y="245" width="200" height="150" rx="26" fill="#8fb0ff" />
   <circle cx="400" cy="305" r="18" fill="#14161a" />
   <rect x="391" y="310" width="18" height="44" rx="7" fill="#14161a" />
-  <text x="400" y="500" font-family="Noto Sans JP" font-weight="700"
-    font-size="44" fill="#9aa1ab" text-anchor="middle">Sealed until</text>
-  <text x="400" y="580" font-family="Noto Sans JP" font-weight="700"
-    font-size="52" fill="#e8e6e1" text-anchor="middle">{{ when }}</text>
+  <text x="400" y="510" font-family="Noto Sans JP" font-weight="700"
+    font-size="44" fill="#e8e6e1" text-anchor="middle">{{ when }}</text>
+  <text x="400" y="590" font-family="Noto Sans JP" font-weight="700"
+    font-size="44" fill="#9aa1ab" text-anchor="middle">まで封印</text>
   <text x="400" y="720" font-family="Noto Sans JP" font-weight="700"
     font-size="36" fill="#9aa1ab" text-anchor="middle">time-sign</text>
 </svg>

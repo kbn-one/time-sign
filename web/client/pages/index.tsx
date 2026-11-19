@@ -1,12 +1,20 @@
 import { css, type Handle } from "remix/component";
 
+import type { Lang } from "../i18n.ts";
 import { REPOSITORY_URL } from "../layout.tsx";
-import { routes } from "../routes.ts";
+import { pagesFor, routes } from "../routes.ts";
 import { color, radius } from "../tokens.ts";
 
-export const title = "time-sign — time-lock encryption";
-export const description =
-  "Encrypt data for a future date. Anyone can encrypt; the key to decrypt is released only after that date has passed.";
+export const title: Record<Lang, string> = {
+  ja: "time-sign — 時限暗号",
+  en: "time-sign — time-lock encryption",
+};
+export const description: Record<Lang, string> = {
+  ja:
+    "未来の日時に向けてデータを暗号化。誰でも暗号化でき、復号の鍵はその日時を過ぎてから公開されます。",
+  en:
+    "Encrypt data for a future date. Anyone can encrypt; the key to decrypt is released only after that date has passed.",
+};
 export const hydrate = false;
 
 const example =
@@ -30,7 +38,107 @@ const verify = `curl -sSo master_pk.bin https://time-sign.kbn.one/master_pk
 gh attestation verify master_pk.bin -R kbn-one/time-sign \\
   --signer-workflow kbn-one/time-sign/.github/workflows/keygen.yml`;
 
-export default function Home(_handle: Handle) {
+export default function Home(handle: Handle<{ lang: Lang }>) {
+  return () => handle.props.lang === "ja" ? <Japanese /> : <English />;
+}
+
+function Japanese(_handle: Handle) {
+  const demo = pagesFor("ja").demo.href();
+  return () => (
+    <>
+      <section mix={heroStyle}>
+        <h1 mix={heroTitleStyle}>未来へメッセージを送る。</h1>
+        <p mix={leadStyle}>
+          time-sign
+          は時限暗号のサーバーです。公開鍵を使えば、誰でも未来の日時に向けてデータを暗号化できます（サーバーへの問い合わせは不要）。復号の鍵は、その日時を過ぎてから公開されます。
+        </p>
+        <p>
+          <a href={demo} mix={buttonStyle}>デモを試す</a>
+        </p>
+      </section>
+
+      <section>
+        <h2>仕組み</h2>
+        <ol>
+          <li>
+            サーバーは ID ベース暗号（IBE）のマスター鍵ペアを持っています。ID
+            は時刻で、10 秒単位に切り上げた 1 通りの表記{" "}
+            <code>2030-01-01T00:00:00Z</code> を使います。
+          </li>
+          <li>
+            マスター公開鍵と時刻を使い、手元で暗号化します。手元から出ていくのは暗号文だけで、このサーバーに送る必要もありません。
+          </li>
+          <li>
+            その時刻を過ぎると、サーバーはその ID
+            のユーザー秘密鍵を公開します。それより前は拒否します。
+          </li>
+        </ol>
+        <p>
+          方式は ID ベース KEM の CGW-KV で、データ本体はカプセル化した鍵による
+          AES-CBC で暗号化します。
+        </p>
+      </section>
+
+      <section>
+        <h2>API</h2>
+        <dl mix={apiStyle}>
+          <dt>
+            <code>GET {routes.masterPk.href()}</code>
+          </dt>
+          <dd>マスター公開鍵（生のバイト列）。</dd>
+          <dt>
+            <code>GET /at/&lt;時刻&gt;</code>
+          </dt>
+          <dd>
+            <code>&lt;時刻&gt;</code>{" "}
+            を過ぎていれば、その時刻のユーザー秘密鍵（生のバイト列）。過ぎる前は
+            {" "}
+            <code>It is not the time</code>{" "}
+            というテキスト。鍵は 10 秒ごとに、UTC の{" "}
+            <code>YYYY-MM-DDTHH:MM:SSZ</code>{" "}
+            という 1 通りの表記に対してだけ発行します。<code>Date.parse</code>
+            {" "}
+            が読めるそれ以外の表記は、切り上げた時刻へ <code>301</code>{" "}
+            でリダイレクトします（<code>/at/2030-01-01</code> →{" "}
+            <code>
+              /at/2030-01-01T00:00:00Z
+            </code>）。そのため鍵が早く出ることはありません。暗号化にもこの表記を使ってください（クライアントの
+            {" "}
+            <code>timeId()</code> で得られます）。読めない日付は{" "}
+            <code>400</code> です。
+          </dd>
+        </dl>
+        <p>CORS は全許可です。どのオリジンのブラウザからも呼べます。</p>
+      </section>
+
+      <section>
+        <h2>使い方</h2>
+        <pre><code>{example}</code></pre>
+        <p>
+          ブラウザでは、<code>{routes.lib.href()}</code>{" "}
+          が同じクライアントを 1 つの ES
+          モジュールにまとめたものです（WebAssembly を内蔵）。
+        </p>
+      </section>
+
+      <section>
+        <h2>信頼性</h2>
+        <p>
+          マスター鍵ペアは GitHub Actions
+          のジョブの中で生成しています。秘密鍵はそのジョブから直接サーバーへ渡り、コミット・出力・GitHub
+          への保存はされません。公開鍵は署名付きのビルド来歴（attestation）とともに公開しているので、このサーバーが配る鍵がそのワークフローで生成されたものか確かめられます:
+        </p>
+        <pre><code>{verify}</code></pre>
+        <p>
+          <a href={REPOSITORY_URL}>GitHub でソースコードを見る</a>
+        </p>
+      </section>
+    </>
+  );
+}
+
+function English(_handle: Handle) {
+  const demo = pagesFor("en").demo.href();
   return () => (
     <>
       <section mix={heroStyle}>
@@ -41,7 +149,7 @@ export default function Home(_handle: Handle) {
           key that decrypts it is published only once that date has passed.
         </p>
         <p>
-          <a href={routes.demo.href()} mix={buttonStyle}>Try the demo</a>
+          <a href={demo} mix={buttonStyle}>Try the demo</a>
         </p>
       </section>
 

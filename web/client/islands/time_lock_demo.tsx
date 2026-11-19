@@ -9,12 +9,26 @@
  * `timeId()`, rounded up to 10 seconds — when sealing, and opening asks for exactly that string. The sealed message is kept in `localStorage`.
  */
 
-import { clientEntry, css, type Handle, on, ref } from "remix/component";
+import {
+  clientEntry,
+  css,
+  type Handle,
+  on,
+  ref,
+  type SerializableValue,
+} from "remix/component";
 
 import "../share_buttons.ts";
+import {
+  formatDuration,
+  formatMoment,
+  type Lang,
+  messages,
+  timeZoneLabel,
+} from "../i18n.ts";
 import { routes } from "../routes.ts";
 import { isMoment, type LinkMode, shareHref } from "../site.ts";
-import { fetchKey, formatDuration, loadClient } from "../time_sign_client.ts";
+import { fetchKey, loadClient } from "../time_sign_client.ts";
 import { color, radius } from "../tokens.ts";
 
 interface Sealed {
@@ -33,35 +47,23 @@ type Outcome =
 
 const STORAGE_KEY = "time-sign-demo";
 
-/** The two kinds of share link, and what choosing one means. */
-const LINK_MODES: [mode: LinkMode, label: string, explanation: string][] = [
-  [
-    "private",
-    "Private link",
-    "The ciphertext rides after the # and never reaches any server. On X it shows as a plain link card; the message is read by opening the link.",
-  ],
-  [
-    "card",
-    "For X (player card, via og.kbn.one)",
-    "On X the card counts down and then opens the message right in the post. og.kbn.one, which writes the card, sees the ciphertext; this server, which holds the master key, still does not.",
-  ],
-];
+/** The two kinds of share link, in the order they are offered (`linkModes` in `i18n.ts`). */
+const LINK_MODES: LinkMode[] = ["private", "card"];
 
 /** Keys are issued every 10 seconds (`TIME_STEP_MS` in `client/time_id.ts`). */
 const STEP_MS = 10_000;
 
-const PRESETS: [label: string, ms: number][] = [
-  ["in 1 minute", 60_000],
-  ["in 10 minutes", 600_000],
-  ["in 1 hour", 3_600_000],
-  ["in 24 hours", 86_400_000],
-  ["in 1 week", 604_800_000],
-];
+export interface TimeLockDemoProps {
+  lang: Lang;
+  [key: string]: SerializableValue;
+}
 
 export const TimeLockDemo = clientEntry(
   import.meta.url,
-  function TimeLockDemo(handle: Handle) {
-    let message = "Hello from the past.";
+  function TimeLockDemo(handle: Handle<TimeLockDemoProps>) {
+    const lang = handle.props.lang;
+    const m = messages[lang].demo;
+    let message = m.defaultMessage;
     /** The moment as a `datetime-local` value, in local time. */
     let moment = "";
     /** Bumped to remount the date input when a preset replaces its value. */
@@ -82,6 +84,8 @@ export const TimeLockDemo = clientEntry(
     let mode: LinkMode = "private";
     let outcome: Outcome = { kind: "none" };
     let now = 0;
+    /** The reader's time zone, which the date field is in; known only in the browser. */
+    let zone = "";
 
     /** Sets the moment, rounded up to the 10 s step keys are issued on, and shows it. */
     function setMoment(at: number) {
@@ -92,6 +96,7 @@ export const TimeLockDemo = clientEntry(
     // Client only: the static build has no "now", and no storage.
     handle.queueTask(() => {
       now = Date.now();
+      zone = timeZoneLabel(lang);
       setMoment(Date.now() + 60_000);
       sealed = readSealed();
       handle.update();
@@ -109,11 +114,11 @@ export const TimeLockDemo = clientEntry(
       if (momentField) moment = momentField.value;
       const at = new Date(moment);
       if (isNaN(at.getTime())) {
-        outcome = { kind: "error", text: "Pick a valid date and time." };
+        outcome = { kind: "error", text: m.pickValid };
         handle.update();
         return;
       }
-      outcome = { kind: "busy", text: "Sealing…" };
+      outcome = { kind: "busy", text: m.sealing };
       handle.update();
       try {
         const { encrypt, timeId } = await loadClient();
@@ -136,13 +141,13 @@ export const TimeLockDemo = clientEntry(
       // What the panel holds now, which may be a message pasted from elsewhere.
       const parsed = parseSealedText(sealedField?.value ?? "");
       if ("error" in parsed) {
-        outcome = { kind: "error", text: parsed.error };
+        outcome = { kind: "error", text: m[parsed.error] };
         handle.update();
         return;
       }
       sealed = parsed;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sealed));
-      outcome = { kind: "busy", text: "Asking the server for the key…" };
+      outcome = { kind: "busy", text: m.fetchKey };
       handle.update();
       try {
         const { decrypt } = await loadClient();
@@ -174,9 +179,9 @@ export const TimeLockDemo = clientEntry(
     return () => (
       <div mix={rootStyle}>
         <section mix={cardStyle} aria-label="Seal">
-          <h2 mix={stepStyle}>1. Seal</h2>
+          <h2 mix={stepStyle}>{m.sealHeading}</h2>
           <label mix={fieldStyle}>
-            Message
+            {m.message}
             <textarea
               rows={3}
               defaultValue={message}
@@ -192,7 +197,10 @@ export const TimeLockDemo = clientEntry(
             />
           </label>
           <label mix={fieldStyle}>
-            Open after
+            <span>
+              {m.openAfter}
+              {zone && <span mix={zoneStyle}>{zone}</span>}
+            </span>
             <input
               key={momentKey}
               type="datetime-local"
@@ -217,7 +225,7 @@ export const TimeLockDemo = clientEntry(
             />
           </label>
           <div mix={rowStyle}>
-            {PRESETS.map(([label, ms]) => (
+            {m.presets.map(([label, ms]) => (
               <button
                 type="button"
                 mix={[
@@ -237,19 +245,21 @@ export const TimeLockDemo = clientEntry(
             disabled={outcome.kind === "busy"}
             mix={[buttonStyle, on("click", seal)]}
           >
-            Seal message
+            {m.seal}
           </button>
         </section>
 
         <section mix={cardStyle} aria-label="Preview">
-          <h2 mix={stepStyle}>2. Preview</h2>
+          <h2 mix={stepStyle}>{m.previewHeading}</h2>
           {sealed && (
             <p>
-              Sealed for <strong>{formatLocal(sealed.id)}</strong>.
+              {m.sealedFor[0]}
+              <strong>{formatMoment(sealed.id, lang)}</strong>
+              {m.sealedFor[1]}
             </p>
           )}
           <label mix={fieldStyle}>
-            Sealed message — this one, or paste another
+            {m.sealedLabel}
             <textarea
               key={sealedKey}
               rows={9}
@@ -273,26 +283,26 @@ export const TimeLockDemo = clientEntry(
               disabled={outcome.kind === "busy"}
               mix={[buttonStyle, on("click", open)]}
             >
-              Open
+              {m.open}
             </button>
             {sealed && (
               <button
                 type="button"
                 mix={[ghostButtonStyle, on("click", forget)]}
               >
-                Forget
+                {m.forget}
               </button>
             )}
           </div>
           {/* Right under the buttons, so the answer to "Open" is where the click was. */}
-          <Status outcome={outcome} sealed={sealed} now={now} />
+          <Status outcome={outcome} sealed={sealed} now={now} lang={lang} />
         </section>
 
         <section mix={cardStyle} aria-label="Share">
-          <h2 mix={stepStyle}>3. Share</h2>
+          <h2 mix={stepStyle}>{m.shareHeading}</h2>
           {sealed && (
             <div role="radiogroup" aria-label="Share link" mix={modeStyle}>
-              {LINK_MODES.map(([value, label, explanation]) => (
+              {LINK_MODES.map((value) => (
                 <label key={value} mix={modeOptionStyle}>
                   <input
                     type="radio"
@@ -305,16 +315,16 @@ export const TimeLockDemo = clientEntry(
                     })}
                   />
                   <span>
-                    <strong>{label}</strong>
+                    <strong>{m.linkModes[value][0]}</strong>
                     <br />
-                    <span mix={mutedStyle}>{explanation}</span>
+                    <span mix={mutedStyle}>{m.linkModes[value][1]}</span>
                   </span>
                 </label>
               ))}
             </div>
           )}
           {/* Empty `url` shares this page; with a sealed message, its link. */}
-          <share-buttons url={sealed ? postLink(sealed, mode) : ""} />
+          <share-buttons url={sealed ? postLink(sealed, mode, lang) : ""} />
         </section>
       </div>
     );
@@ -322,10 +332,13 @@ export const TimeLockDemo = clientEntry(
 );
 
 function Status(
-  handle: Handle<{ outcome: Outcome; sealed: Sealed | null; now: number }>,
+  handle: Handle<
+    { outcome: Outcome; sealed: Sealed | null; now: number; lang: Lang }
+  >,
 ) {
   return () => {
-    const { outcome, sealed, now } = handle.props;
+    const { outcome, sealed, now, lang } = handle.props;
+    const m = messages[lang].demo;
     switch (outcome.kind) {
       case "none":
         return null;
@@ -335,16 +348,14 @@ function Status(
         const left = sealed ? Date.parse(sealed.id) - now : 0;
         return (
           <p role="status" mix={lockedStyle}>
-            🔒 The server says it is not the time yet. {left > 0
-              ? `${formatDuration(left)} to go.`
-              : "It should be now — try again."}
+            {left > 0 ? m.locked(formatDuration(left, lang)) : m.lockedNow}
           </p>
         );
       }
       case "opened":
         return (
           <div role="status" mix={openedStyle}>
-            <p>🔓 Opened:</p>
+            <p>{m.opened}</p>
             <blockquote>{outcome.text}</blockquote>
           </div>
         );
@@ -355,12 +366,13 @@ function Status(
 }
 
 /** The link to share a sealed message by, of the chosen kind. */
-function postLink(sealed: Sealed, mode: LinkMode): string {
+function postLink(sealed: Sealed, mode: LinkMode, lang: Lang): string {
   return shareHref(
     location.origin,
     sealed.id,
     Uint8Array.fromBase64(sealed.ciphertext),
     mode,
+    lang,
   );
 }
 
@@ -373,7 +385,9 @@ function sealedText(sealed: Sealed): string {
  * The Open panel's text back into a sealed message: a `# identity` section holding the moment, a
  * `# ciphertext` section holding base64 or base64url (line breaks and spaces ignored).
  */
-function parseSealedText(text: string): Sealed | { error: string } {
+function parseSealedText(
+  text: string,
+): Sealed | { error: "badIdentity" | "emptyCiphertext" | "badCiphertext" } {
   const sections: Record<string, string> = {};
   let current = "";
   for (const line of text.split(/\r?\n/)) {
@@ -383,20 +397,17 @@ function parseSealedText(text: string): Sealed | { error: string } {
   }
   const id = sections.identity?.trim() ?? "";
   if (!isMoment(id)) {
-    return {
-      error:
-        "The # identity section needs a moment like 2030-01-01T00:00:00Z (seconds ending in 0).",
-    };
+    return { error: "badIdentity" };
   }
   const raw = (sections.ciphertext ?? "").replace(/\s+/g, "");
-  if (!raw) return { error: "The # ciphertext section is empty." };
+  if (!raw) return { error: "emptyCiphertext" };
   try {
     const bytes = Uint8Array.fromBase64(
       raw.replaceAll("-", "+").replaceAll("_", "/"),
     );
     return { id, ciphertext: bytes.toBase64() };
   } catch {
-    return { error: "The # ciphertext section is not base64." };
+    return { error: "badCiphertext" };
   }
 }
 
@@ -422,10 +433,6 @@ function toLocalInput(date: Date): string {
   }`;
 }
 
-function formatLocal(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
-
 const rootStyle = css({ display: "grid", gap: "1.25rem" });
 
 const cardStyle = css({
@@ -438,6 +445,13 @@ const cardStyle = css({
 });
 
 const stepStyle = css({ margin: 0, fontSize: "1.15rem" });
+
+const zoneStyle = css({
+  marginLeft: "0.5rem",
+  fontWeight: 400,
+  color: color.muted,
+  fontSize: "0.85rem",
+});
 
 const fieldStyle = css({ display: "grid", gap: "0.35rem", fontWeight: 600 });
 
