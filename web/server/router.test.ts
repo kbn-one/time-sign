@@ -88,6 +88,12 @@ Deno.test("GET /client.js serves the browser bundle of the client", async () => 
   const res = await router.fetch(new Request("http://localhost/client.js"));
   assertEquals(res.status, 200);
   assertStringIncludes(res.headers.get("content-type") ?? "", "javascript");
+  // importable from any site's module script
+  assertEquals(res.headers.get("access-control-allow-origin"), "*");
+  assertStringIncludes(
+    headersFile(),
+    "/client.js\n  access-control-allow-origin: *",
+  );
   const js = await res.text();
   assertStringIncludes(js, "export");
   assertStringIncludes(js, "encrypt");

@@ -27,7 +27,7 @@ import { MARKDOWN_SRC } from "../client/message_view.ts";
 import { postMeta, SITE_ORIGIN } from "../client/site.ts";
 import { API_PATHS, createApi, isApiPath } from "./api.ts";
 import { assets, assetsPath } from "./assets.ts";
-import { EMBED_HEADERS } from "./headers.ts";
+import { EMBED_HEADERS, LIB_HEADERS } from "./headers.ts";
 
 export { API_PATHS };
 
@@ -142,7 +142,10 @@ pages.get(
   routes.lib,
   () =>
     new Response(timeSignClient, {
-      headers: { "content-type": "text/javascript; charset=utf-8" },
+      headers: {
+        "content-type": "text/javascript; charset=utf-8",
+        ...LIB_HEADERS,
+      },
     }),
 );
 pages.get(routes.static, ({ request }) => staticFiles.fetch(request));
