@@ -31,7 +31,7 @@ export const routes = route({
     embed: get("/embed"),
   }),
   /** `client/mod.ts` bundled for the browser (`deno task build:lib`), wasm inlined. */
-  lib: get("/time-sign.js"),
+  lib: get("/client.js"),
   static: get("/static/*path"),
   masterPk: get("/master_pk"),
   // A wildcard rather than `:at`: a route-pattern param stops at `.`, and a

@@ -1,5 +1,5 @@
 /**
- * The time-sign client (`client/mod.ts`), loaded in the browser from `/time-sign.js` on first use.
+ * The time-sign client (`client/mod.ts`), loaded in the browser from `/client.js` on first use.
  *
  * It is a separate bundle with the WebAssembly inlined, so a page pays for it only when it seals or
  * opens a message.

@@ -2,7 +2,7 @@
  * The demo: seal a message for a moment, then try to open it.
  *
  * Sealing fetches the master public key and encrypts in the page with the time-sign client
- * (`/time-sign.js`, imported on first use). Opening fetches `/at/<moment>`: before the moment the
+ * (`/client.js`, imported on first use). Opening fetches `/at/<moment>`: before the moment the
  * server answers "It is not the time", after it the user secret key, which decrypts the message.
  *
  * The moment is the identity, so it is fixed to the one spelling the server issues keys for —

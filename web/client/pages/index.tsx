@@ -18,7 +18,7 @@ export const description: Record<Lang, string> = {
 export const hydrate = false;
 
 const example =
-  `import { decrypt, encrypt, timeId } from "https://raw.githubusercontent.com/kbn-one/time-sign/main/client/mod.ts";
+  `import { decrypt, encrypt, timeId } from "https://time-sign.kbn.one/client.js";
 
 const server = "https://time-sign.kbn.one";
 const id = timeId("2030-01-01"); // "2030-01-01T00:00:00Z"
@@ -115,9 +115,10 @@ function Japanese(_handle: Handle) {
         <h2>使い方</h2>
         <pre><code>{example}</code></pre>
         <p>
-          ブラウザでは、<code>{routes.lib.href()}</code>{" "}
-          が同じクライアントを 1 つの ES
-          モジュールにまとめたものです（WebAssembly を内蔵）。
+          <code>{routes.lib.href()}</code>{" "}
+          はクライアント（<code>client/mod.ts</code>）を 1 つの ES
+          モジュールにまとめたもので（WebAssembly を内蔵）、ブラウザからも Deno
+          からもそのまま import できます。
         </p>
       </section>
 
@@ -210,9 +211,10 @@ function English(_handle: Handle) {
         <h2>Use it</h2>
         <pre><code>{example}</code></pre>
         <p>
-          In the browser, <code>{routes.lib.href()}</code>{" "}
-          is the same client bundled as one ES module (the WebAssembly is
-          inlined).
+          <code>{routes.lib.href()}</code> is the client (<code>
+            client/mod.ts
+          </code>) bundled as one ES module, with the WebAssembly inlined; a
+          browser or Deno can import it as is.
         </p>
       </section>
 

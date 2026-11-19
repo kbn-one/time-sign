@@ -84,14 +84,14 @@ Deno.test("a moment is said in the reader's time zone, abbreviated", () => {
   assertEquals(timeZoneLabel("ja", "Asia/Tokyo"), "JST (Asia/Tokyo)");
 });
 
-Deno.test("GET /time-sign.js serves the browser bundle of the client", async () => {
-  const res = await router.fetch(new Request("http://localhost/time-sign.js"));
+Deno.test("GET /client.js serves the browser bundle of the client", async () => {
+  const res = await router.fetch(new Request("http://localhost/client.js"));
   assertEquals(res.status, 200);
   assertStringIncludes(res.headers.get("content-type") ?? "", "javascript");
   const js = await res.text();
   assertStringIncludes(js, "export");
   assertStringIncludes(js, "encrypt");
-  assert(entryPoints.includes("/time-sign.js"));
+  assert(entryPoints.includes("/client.js"));
 });
 
 Deno.test("GET /static/app.css", async () => {
