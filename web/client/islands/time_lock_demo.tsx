@@ -188,7 +188,7 @@ export const TimeLockDemo = clientEntry(
           <label mix={fieldStyle}>
             {m.message}
             <textarea
-              rows={3}
+              rows={5}
               defaultValue={message}
               mix={[
                 inputStyle,
