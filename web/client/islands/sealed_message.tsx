@@ -11,12 +11,14 @@ import {
   css,
   type Handle,
   on,
+  type RemixNode,
   type SerializableValue,
 } from "remix/component";
 
 import "../share_buttons.ts";
 import { formatDuration, formatMoment, type Lang, messages } from "../i18n.ts";
 import { pagesFor } from "../routes.ts";
+import { renderMessage } from "../message_view.ts";
 import { parsePost } from "../site.ts";
 import { fetchKey, loadClient } from "../time_sign_client.ts";
 import { color, radius } from "../tokens.ts";
@@ -26,7 +28,7 @@ type State =
   | { kind: "invalid"; text: string }
   | { kind: "locked" }
   | { kind: "opening" }
-  | { kind: "opened"; text: string }
+  | { kind: "opened"; node: RemixNode }
   | { kind: "error"; text: string };
 
 export interface SealedMessageProps {
@@ -56,7 +58,10 @@ export const SealedMessage = clientEntry(
         } else {
           const { decrypt } = await loadClient();
           const plain = await decrypt(answer.usk, ciphertext);
-          state = { kind: "opened", text: new TextDecoder().decode(plain) };
+          state = {
+            kind: "opened",
+            node: await renderMessage(new TextDecoder().decode(plain)),
+          };
         }
       } catch (error) {
         state = { kind: "error", text: String(error) };
@@ -142,7 +147,7 @@ function body(
       return (
         <>
           <p mix={bigStyle}>{m.opened(when)}</p>
-          <blockquote mix={messageStyle}>{state.text}</blockquote>
+          <blockquote mix={messageStyle}>{state.node}</blockquote>
         </>
       );
     case "error":
@@ -181,6 +186,10 @@ const messageStyle = css({
   whiteSpace: "pre-wrap",
   overflowWrap: "anywhere",
   fontSize: "1.1rem",
+  "& > :first-child": { marginTop: 0 },
+  "& > :last-child": { marginBottom: 0 },
+  "& p, & ul, & ol, & pre, & blockquote": { margin: "0.5em 0" },
+  "& pre": { whiteSpace: "pre-wrap" },
 });
 
 const footStyle = css({

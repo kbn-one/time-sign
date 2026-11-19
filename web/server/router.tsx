@@ -23,6 +23,7 @@ import * as Home from "../client/pages/index.tsx";
 import Post from "../client/pages/post.tsx";
 import { type Lang, LANGS } from "../client/i18n.ts";
 import { type PageName, pagesFor, routes } from "../client/routes.ts";
+import { MARKDOWN_SRC } from "../client/message_view.ts";
 import { postMeta, SITE_ORIGIN } from "../client/site.ts";
 import { API_PATHS, createApi, isApiPath } from "./api.ts";
 import { assets, assetsPath } from "./assets.ts";
@@ -44,6 +45,8 @@ export const entryPoints: readonly string[] = [
     return [page.home.href(), page.post.href(), page.embed.href()];
   }),
   routes.lib.href(),
+  // Loaded by URL when a message is opened, so no page or import names it.
+  MARKDOWN_SRC,
   routes.static.href({ path: "card.png" }),
   routes.static.href({ path: "og-card.svg" }),
   routes.static.href({ path: "og-card-en.svg" }),

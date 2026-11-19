@@ -13,6 +13,7 @@ import {
   clientEntry,
   css,
   type Handle,
+  type RemixNode,
   type SerializableValue,
 } from "remix/component";
 
@@ -23,6 +24,7 @@ import {
   type Messages,
   messages,
 } from "../i18n.ts";
+import { renderMessage } from "../message_view.ts";
 import { pagesFor } from "../routes.ts";
 import { isMoment, parsePost, SITE_ORIGIN } from "../site.ts";
 import { fetchKey, loadClient } from "../time_sign_client.ts";
@@ -34,7 +36,7 @@ type State =
   | { kind: "locked" }
   | { kind: "unlocked" }
   | { kind: "opening" }
-  | { kind: "opened"; text: string }
+  | { kind: "opened"; node: RemixNode }
   | { kind: "error"; text: string };
 
 export interface SealedCardProps {
@@ -63,7 +65,10 @@ export const SealedCard = clientEntry(
         } else {
           const { decrypt } = await loadClient();
           const plain = await decrypt(answer.usk, ciphertext);
-          state = { kind: "opened", text: new TextDecoder().decode(plain) };
+          state = {
+            kind: "opened",
+            node: await renderMessage(new TextDecoder().decode(plain)),
+          };
         }
       } catch (error) {
         state = { kind: "error", text: String(error) };
@@ -171,7 +176,7 @@ function view(state: State, moment: string, now: number, lang: Lang) {
       return (
         <>
           <p mix={subStyle}>{m.sealedUntil(formatMoment(moment, lang))}</p>
-          <p mix={messageStyle}>{state.text}</p>
+          <div mix={messageStyle}>{state.node}</div>
         </>
       );
     case "error":
@@ -227,6 +232,10 @@ const messageStyle = css({
   fontWeight: 600,
   whiteSpace: "pre-wrap",
   overflowWrap: "anywhere",
+  "& > :first-child": { marginTop: 0 },
+  "& > :last-child": { marginBottom: 0 },
+  "& p, & ul, & ol, & pre, & blockquote": { margin: "0.5em 0" },
+  "& pre": { whiteSpace: "pre-wrap" },
 });
 
 const brandStyle = css({
