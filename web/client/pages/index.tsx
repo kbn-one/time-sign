@@ -17,8 +17,14 @@ export const description: Record<Lang, string> = {
 };
 export const hydrate = false;
 
-const example =
-  `import { decrypt, encrypt, timeId } from "https://raw.githubusercontent.com/kbn-one/time-sign/main/client/mod.ts";
+/** The client bundle (`client/mod.js`) of a release tag, served by jsDelivr with CORS. */
+const CLIENT_URL =
+  "https://cdn.jsdelivr.net/gh/kbn-one/time-sign@v1.0.0/client/mod.js";
+/** The same client as TypeScript source, for Deno with types. */
+const CLIENT_TS_URL =
+  "https://raw.githubusercontent.com/kbn-one/time-sign/v1.0.0/client/mod.ts";
+
+const example = `import { decrypt, encrypt, timeId } from "${CLIENT_URL}";
 
 const server = "https://time-sign.kbn.one";
 const id = timeId("2030-01-01"); // "2030-01-01T00:00:00Z"
@@ -115,9 +121,10 @@ function Japanese(_handle: Handle) {
         <h2>使い方</h2>
         <pre><code>{example}</code></pre>
         <p>
-          ブラウザでは、<code>{routes.lib.href()}</code>{" "}
-          が同じクライアントを 1 つの ES
-          モジュールにまとめたものです（WebAssembly を内蔵）。
+          読み込むのはクライアント（<code>client/mod.ts</code>）を 1 つの ES
+          モジュールにまとめたもの（WebAssembly を内蔵）で、ブラウザでも Deno
+          でもそのまま動きます。Deno で型を付けたいときは{" "}
+          <code>{CLIENT_TS_URL}</code> を import してください。
         </p>
       </section>
 
@@ -210,9 +217,9 @@ function English(_handle: Handle) {
         <h2>Use it</h2>
         <pre><code>{example}</code></pre>
         <p>
-          In the browser, <code>{routes.lib.href()}</code>{" "}
-          is the same client bundled as one ES module (the WebAssembly is
-          inlined).
+          This is the client (<code>client/mod.ts</code>) bundled as one ES
+          module, with the WebAssembly inlined: it runs as is in a browser or
+          Deno. For types in Deno, import <code>{CLIENT_TS_URL}</code> instead.
         </p>
       </section>
 
