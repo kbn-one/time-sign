@@ -15,6 +15,7 @@ import {
   type Handle,
   on,
   ref,
+  type RemixNode,
   type SerializableValue,
 } from "remix/component";
 
@@ -26,6 +27,7 @@ import {
   messages,
   timeZoneLabel,
 } from "../i18n.ts";
+import { renderMessage } from "../message_view.ts";
 import { routes } from "../routes.ts";
 import { isMoment, type LinkMode, shareHref } from "../site.ts";
 import { fetchKey, loadClient } from "../time_sign_client.ts";
@@ -42,7 +44,7 @@ type Outcome =
   | { kind: "none" }
   | { kind: "busy"; text: string }
   | { kind: "locked" }
-  | { kind: "opened"; text: string }
+  | { kind: "opened"; node: RemixNode }
   | { kind: "error"; text: string };
 
 const STORAGE_KEY = "time-sign-demo";
@@ -160,7 +162,10 @@ export const TimeLockDemo = clientEntry(
             answer.usk,
             Uint8Array.fromBase64(sealed.ciphertext),
           );
-          outcome = { kind: "opened", text: new TextDecoder().decode(plain) };
+          outcome = {
+            kind: "opened",
+            node: await renderMessage(new TextDecoder().decode(plain)),
+          };
         }
       } catch (error) {
         outcome = { kind: "error", text: String(error) };
@@ -183,7 +188,7 @@ export const TimeLockDemo = clientEntry(
           <label mix={fieldStyle}>
             {m.message}
             <textarea
-              rows={3}
+              rows={5}
               defaultValue={message}
               mix={[
                 inputStyle,
@@ -356,7 +361,7 @@ function Status(
         return (
           <div role="status" mix={openedStyle}>
             <p>{m.opened}</p>
-            <blockquote>{outcome.text}</blockquote>
+            <blockquote>{outcome.node}</blockquote>
           </div>
         );
       case "error":
@@ -496,13 +501,20 @@ const mutedStyle = css({ color: color.muted, margin: 0 });
 const lockedStyle = css({ margin: 0, fontWeight: 600 });
 
 const openedStyle = css({
-  "& p": { margin: 0, fontWeight: 600 },
+  "& > p": { margin: 0, fontWeight: 600 },
   "& blockquote": {
     margin: "0.5rem 0 0",
     padding: "0.5rem 1rem",
     borderLeft: `3px solid ${color.accent}`,
     whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
   },
+  "& blockquote > :first-child": { marginTop: 0 },
+  "& blockquote > :last-child": { marginBottom: 0 },
+  "& blockquote p, & blockquote ul, & blockquote ol, & blockquote pre": {
+    margin: "0.5em 0",
+  },
+  "& blockquote pre": { whiteSpace: "pre-wrap" },
 });
 
 const errorStyle = css({ margin: 0, color: color.danger });

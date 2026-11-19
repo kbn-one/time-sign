@@ -15,6 +15,7 @@
     "@cloudflare/build-output-utils": "npm:@cloudflare/build-output-utils@0.9.5",
     "@cloudflare/config": "npm:@cloudflare/config@0.28.1",
     "@deno/wasmbuild": "jsr:@deno/wasmbuild@^0.23.0",
+    "@kuboon/md": "jsr:@kuboon/md@^0.9.0",
     "@kuboon/share-element": "jsr:@kuboon/share-element@^0.7.0",
     "@remix-kbn/assets-deno": "jsr:@remix-kbn/assets-deno@^0.9.0",
     "@remix-kbn/ssg": "jsr:@remix-kbn/ssg@^0.13.0",

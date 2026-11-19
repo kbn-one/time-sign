@@ -14,7 +14,9 @@ export const assetsPath = "/assets";
 
 export const assets = await createAssetServer({
   rootDir: decodeURIComponent(clientDir.pathname),
-  entrypoints: ["hydration.ts", "islands/*.tsx"],
+  // `markdown.ts` is loaded by URL when a message is opened (`client/message_view.ts`), so it is
+  // an entrypoint of the same graph rather than an import of the islands.
+  entrypoints: ["hydration.ts", "islands/*.tsx", "markdown.ts"],
   basePath: assetsPath,
   mode: "bundle",
   bundle: { sourcemap: "none" },

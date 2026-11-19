@@ -138,7 +138,8 @@ export const messages: Record<Lang, Messages> = {
     demo: {
       sealHeading: "1. 封をする",
       message: "メッセージ",
-      defaultMessage: "過去からこんにちは。",
+      defaultMessage:
+        "**過去から**こんにちは。\n\n- Markdown で書けます\n- URL はリンクになります: https://time-sign.kbn.one",
       openAfter: "開封できる日時",
       presets: [
         ["1分後", MINUTE],
@@ -211,7 +212,8 @@ export const messages: Record<Lang, Messages> = {
     demo: {
       sealHeading: "1. Seal",
       message: "Message",
-      defaultMessage: "Hello from the past.",
+      defaultMessage:
+        "Hello **from the past**.\n\n- Write it in Markdown\n- URLs become links: https://time-sign.kbn.one/en",
       openAfter: "Open after",
       presets: [
         ["in 1 minute", MINUTE],
