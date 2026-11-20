@@ -9,7 +9,7 @@ import {
   decrypt,
   encrypt,
   timeId,
-} from "https://raw.githubusercontent.com/kbn-one/time-sign/main/client/mod.ts";
+} from "https://cdn.jsdelivr.net/gh/kbn-one/time-sign@v1.0.0/client/mod.js";
 
 const server = "https://time-sign.kbn.one";
 // Keys are issued every 10 seconds, for one spelling of a moment (UTC, rounded
@@ -27,6 +27,10 @@ const usk = new Uint8Array(
 );
 console.log(new TextDecoder().decode(await decrypt(usk, enc)));
 ```
+
+`client/mod.js` is the client bundled as one ES module (WebAssembly inlined), so
+it runs as is in browsers and Deno; for types in Deno, import
+`https://raw.githubusercontent.com/kbn-one/time-sign/v1.0.0/client/mod.ts`.
 
 `GET /at/<date>` with any other spelling of a date is a `301` to
 `/at/<timeId(date)>`; before the moment it answers `It is not the time`.
